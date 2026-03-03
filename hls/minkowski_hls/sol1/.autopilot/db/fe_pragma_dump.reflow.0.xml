@@ -1,0 +1,16 @@
+<pragmas>
+<pragma file="src/fpga_kernels.cpp" line="60" pragmaType="loop_tripcount" parentfunction="predict_kernel" min="0" max="32" avg="16"/>
+<pragma file="src/fpga_kernels.cpp" line="62" pragmaType="pipeline" parentfunction="predict_kernel" off="0" ii="1" rewind="0" style=""/>
+<pragma file="src/fpga_kernels.cpp" line="47" pragmaType="loop_tripcount" parentfunction="predict_kernel" min="0" max="32" avg="16"/>
+<pragma file="src/fpga_kernels.cpp" line="49" pragmaType="pipeline" parentfunction="predict_kernel" off="0" ii="1" rewind="0" style=""/>
+<pragma file="src/fpga_kernels.cpp" line="52" pragmaType="unroll" parentfunction="predict_kernel" factor="-1" skip_exit_check="0"/>
+<pragma file="src/fpga_kernels.cpp" line="36" pragmaType="pipeline" parentfunction="predict_kernel" off="0" ii="1" rewind="0" style=""/>
+<pragma file="src/fpga_kernels.cpp" line="39" pragmaType="unroll" parentfunction="predict_kernel" factor="-1" skip_exit_check="0"/>
+<pragma file="src/fpga_kernels.cpp" line="24" pragmaType="array_partition" parentfunction="predict_kernel" dim="2" factor="0" mode="complete" dynamic="0" variable="A"/>
+<pragma file="src/fpga_kernels.cpp" line="25" pragmaType="array_partition" parentfunction="predict_kernel" dim="1" factor="0" mode="complete" dynamic="0" variable="p_x"/>
+<pragma file="src/fpga_kernels.cpp" line="26" pragmaType="array_partition" parentfunction="predict_kernel" dim="1" factor="0" mode="complete" dynamic="0" variable="p_w"/>
+<pragma file="src/fpga_kernels.cpp" line="27" pragmaType="array_partition" parentfunction="predict_kernel" dim="1" factor="0" mode="complete" dynamic="0" variable="p_pred"/>
+<pragma file="src/fpga_kernels.cpp" line="29" pragmaType="array_partition" parentfunction="predict_kernel" dim="1" factor="0" mode="complete" dynamic="0" variable="H_x"/>
+<pragma file="src/fpga_kernels.cpp" line="30" pragmaType="array_partition" parentfunction="predict_kernel" dim="1" factor="0" mode="complete" dynamic="0" variable="H_w"/>
+<pragma file="src/fpga_kernels.cpp" line="31" pragmaType="array_partition" parentfunction="predict_kernel" dim="1" factor="0" mode="complete" dynamic="0" variable="H_pred"/>
+</pragmas>

@@ -1,0 +1,983 @@
+FPGA TB repo_root=/home/zzh/minkowski_fpga/hls
+FPGA TB out_base=/home/zzh/minkowski_fpga/hls/data/output/fpga/cosim
+[LAMBDA_NONE] k=0 done (m=12, predict=1473.0us, strip=0.5us, row_sum=0.3us)
+[LAMBDA_NONE] k=1 done (m=12, predict=65.3us, strip=0.6us, row_sum=0.1us)
+[LAMBDA_NONE] k=2 done (m=12, predict=59.2us, strip=0.6us, row_sum=0.2us)
+[LAMBDA_NONE] k=3 done (m=12, predict=48.2us, strip=0.6us, row_sum=0.1us)
+[LAMBDA_NONE] k=4 done (m=12, predict=55.2us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] k=5 done (m=12, predict=46.6us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] k=6 done (m=12, predict=46.1us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] k=7 done (m=12, predict=48.1us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] k=8 done (m=12, predict=57.2us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] k=9 done (m=12, predict=47.3us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] k=10 done (m=12, predict=46.0us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] k=11 done (m=12, predict=68.3us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] k=12 done (m=12, predict=48.9us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] k=13 done (m=12, predict=47.3us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] k=14 done (m=12, predict=46.6us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] outputs: /home/zzh/minkowski_fpga/hls/data/output/fpga/cosim/LAMBDA_NONE
+[LAMBDA_NONE] kernel_time_summary_us.csv: total_predict=2203.4us (n=15, avg=146.9us), total_strip=7.6us (n=30, avg=0.3us), total_row_sum=1.9us (n=15, avg=0.1us)
+[LAMBDA_SEGMENT] k=0 done (m=12, predict=52.3us, strip=0.4us, row_sum=0.1us)
+[LAMBDA_SEGMENT] k=1 done (m=12, predict=56.3us, strip=0.6us, row_sum=0.2us)
+[LAMBDA_SEGMENT] k=2 done (m=12, predict=47.6us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_SEGMENT] k=3 done (m=12, predict=46.3us, strip=0.4us, row_sum=0.1us)
+[LAMBDA_SEGMENT] k=4 done (m=12, predict=47.4us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_SEGMENT] k=5 done (m=12, predict=51.7us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_SEGMENT] k=6 done (m=12, predict=51.1us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_SEGMENT] k=7 done (m=12, predict=47.4us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_SEGMENT] k=8 done (m=12, predict=74.5us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_SEGMENT] k=9 done (m=12, predict=48.3us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_SEGMENT] k=10 done (m=12, predict=55.0us, strip=0.6us, row_sum=0.2us)
+[LAMBDA_SEGMENT] k=11 done (m=12, predict=48.3us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_SEGMENT] k=12 done (m=12, predict=54.3us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_SEGMENT] k=13 done (m=12, predict=51.8us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_SEGMENT] k=14 done (m=12, predict=48.7us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_SEGMENT] outputs: /home/zzh/minkowski_fpga/hls/data/output/fpga/cosim/LAMBDA_SEGMENT
+[LAMBDA_SEGMENT] kernel_time_summary_us.csv: total_predict=780.8us (n=15, avg=52.1us), total_strip=7.6us (n=30, avg=0.3us), total_row_sum=2.4us (n=15, avg=0.2us)
+[LAMBDA_VOLUME] k=0 done (m=12, predict=166.9us, strip=0.4us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=1 done (m=12, predict=52.8us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_VOLUME] k=2 done (m=12, predict=57.2us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=3 done (m=12, predict=51.5us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_VOLUME] k=4 done (m=12, predict=50.7us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_VOLUME] k=5 done (m=12, predict=50.9us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_VOLUME] k=6 done (m=12, predict=51.0us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_VOLUME] k=7 done (m=12, predict=50.9us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_VOLUME] k=8 done (m=12, predict=46.1us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_VOLUME] k=9 done (m=12, predict=46.7us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=10 done (m=12, predict=46.2us, strip=0.4us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=11 done (m=12, predict=47.1us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=12 done (m=12, predict=46.6us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=13 done (m=12, predict=46.3us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=14 done (m=12, predict=48.0us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_VOLUME] outputs: /home/zzh/minkowski_fpga/hls/data/output/fpga/cosim/LAMBDA_VOLUME
+[LAMBDA_VOLUME] kernel_time_summary_us.csv: total_predict=859.0us (n=15, avg=57.3us), total_strip=7.2us (n=30, avg=0.2us), total_row_sum=2.0us (n=15, avg=0.1us)
+[LAMBDA_P_RADIUS] k=0 done (m=12, predict=69.5us, strip=0.4us, row_sum=0.1us)
+[LAMBDA_P_RADIUS] k=1 done (m=12, predict=52.7us, strip=0.6us, row_sum=0.2us)
+[LAMBDA_P_RADIUS] k=2 done (m=12, predict=94.7us, strip=0.6us, row_sum=0.3us)
+[LAMBDA_P_RADIUS] k=3 done (m=12, predict=51.3us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_P_RADIUS] k=4 done (m=12, predict=47.1us, strip=0.4us, row_sum=0.2us)
+[LAMBDA_P_RADIUS] k=5 done (m=12, predict=47.1us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_P_RADIUS] k=6 done (m=12, predict=53.2us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_P_RADIUS] k=7 done (m=12, predict=47.2us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_P_RADIUS] k=8 done (m=12, predict=46.0us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_P_RADIUS] k=9 done (m=12, predict=52.1us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_P_RADIUS] k=10 done (m=12, predict=47.0us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_P_RADIUS] k=11 done (m=12, predict=48.8us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_P_RADIUS] k=12 done (m=12, predict=51.7us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_P_RADIUS] k=13 done (m=12, predict=68.9us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_P_RADIUS] k=14 done (m=12, predict=47.8us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_P_RADIUS] outputs: /home/zzh/minkowski_fpga/hls/data/output/fpga/cosim/LAMBDA_P_RADIUS
+[LAMBDA_P_RADIUS] kernel_time_summary_us.csv: total_predict=825.3us (n=15, avg=55.0us), total_strip=7.3us (n=30, avg=0.2us), total_row_sum=3.0us (n=15, avg=0.2us)
+All done. Results under: /home/zzh/minkowski_fpga/hls/data/output/fpga/cosim
+Vivado Simulator v2025.2
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+Copyright 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+Running: /opt/Xilinx/2025.2/Vivado/bin/unwrapped/lnx64.o/xelab xil_defaultlib.apatb_predict_kernel_top xil_defaultlib.glbl -Oenable_linking_all_libraries -prj predict_kernel.prj -L smartconnect_v1_0 -L axi_protocol_checker_v1_1_12 -L axi_protocol_checker_v1_1_13 -L axis_protocol_checker_v1_1_11 -L axis_protocol_checker_v1_1_12 -L xil_defaultlib -L unisims_ver -L xpm -L floating_point_v7_1_21 -L floating_point_v7_0_26 --lib ieee_proposed=./ieee_proposed -L uvm -relax -i ./svr -i ./svtb -i ./file_agent -i ./predict_kernel_subsystem -s predict_kernel 
+Multi-threading is on. Using 30 slave threads.
+Determining compilation order of HDL files.
+WARNING: [XSIM 43-3431] One or more environment variables have been detected which affect the operation of the C compiler. These are typically not set in standard installations and are not tested by AMD, however they may be appropriate for your system, so the flow will attempt to continue.  If errors occur, try running xelab with the "-mt off -v 1" switches to see more information from the C compiler. The following environment variables have been detected:
+    LIBRARY_PATH
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/glbl.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module glbl
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/AESL_automem_H_pred_1.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module AESL_automem_H_pred_1
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/predict_kernel.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module predict_kernel
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/AESL_automem_H_w_2.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module AESL_automem_H_w_2
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/AESL_automem_H_pred_3.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module AESL_automem_H_pred_3
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/AESL_automem_H_w_0.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module AESL_automem_H_w_0
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/AESL_automem_H_pred_0.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module AESL_automem_H_pred_0
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/AESL_automem_H_x_2.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module AESL_automem_H_x_2
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/predict_kernel_flow_control_loop_pipe_sequential_init.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module predict_kernel_flow_control_loop_pipe_sequential_init
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/AESL_automem_H_x_1.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module AESL_automem_H_x_1
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/AESL_automem_H_w_3.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module AESL_automem_H_w_3
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/AESL_automem_H_pred_2.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module AESL_automem_H_pred_2
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/AESL_automem_A_3.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module AESL_automem_A_3
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/predict_kernel.autotb.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module apatb_predict_kernel_top
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/predict_kernel_predict_kernel_Pipeline_VITIS_LOOP_45_3_VITIS_LOOP_48_4.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module predict_kernel_predict_kernel_Pipeline_VITIS_LOOP_45_3_VITIS_LOOP_48_4
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/AESL_automem_A_0.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module AESL_automem_A_0
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/predict_kernel_sparsemux_9_2_32_1_1.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module predict_kernel_sparsemux_9_2_32_1_1
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/AESL_automem_A_1.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module AESL_automem_A_1
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/AESL_automem_H_x_3.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module AESL_automem_H_x_3
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/predict_kernel_fadd_32ns_32ns_32_4_full_dsp_1.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module predict_kernel_fadd_32ns_32ns_32_4_full_dsp_1
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/predict_kernel_predict_kernel_Pipeline_VITIS_LOOP_59_6_VITIS_LOOP_61_7.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module predict_kernel_predict_kernel_Pipeline_VITIS_LOOP_59_6_VITIS_LOOP_61_7
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/predict_kernel_fmul_32ns_32ns_32_3_max_dsp_1.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module predict_kernel_fmul_32ns_32ns_32_3_max_dsp_1
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/predict_kernel_predict_kernel_Pipeline_VITIS_LOOP_35_1.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module predict_kernel_predict_kernel_Pipeline_VITIS_LOOP_35_1
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/AESL_automem_H_x_0.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module AESL_automem_H_x_0
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/AESL_automem_A_2.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module AESL_automem_A_2
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/AESL_automem_H_w_1.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module AESL_automem_H_w_1
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/dataflow_monitor.sv" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module dataflow_monitor
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/file_agent/file_agent_pkg.sv" into library xil_defaultlib
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/svr/svr_pkg.sv" into library xil_defaultlib
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/svr/svr_if.sv" into library xil_defaultlib
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/predict_kernel_subsystem/predict_kernel_subsystem_pkg.sv" into library xil_defaultlib
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/svtb/misc_interface.sv" into library xil_defaultlib
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/svtb/sv_module_top.sv" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module sv_module_top
+INFO: [VRFC 10-163] Analyzing VHDL file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/ip/xil_defaultlib/predict_kernel_fmul_32ns_32ns_32_3_max_dsp_1_ip.vhd" into library xil_defaultlib
+INFO: [VRFC 10-3107] analyzing entity 'predict_kernel_fmul_32ns_32ns_32_3_max_dsp_1_ip'
+INFO: [VRFC 10-163] Analyzing VHDL file "/home/zzh/minkowski_fpga/hls/minkowski_hls/sol1/sim/verilog/ip/xil_defaultlib/predict_kernel_fadd_32ns_32ns_32_4_full_dsp_1_ip.vhd" into library xil_defaultlib
+INFO: [VRFC 10-3107] analyzing entity 'predict_kernel_fadd_32ns_32ns_32_4_full_dsp_1_ip'
+Starting static elaboration
+Pass Through NonSizing Optimizer
+Completed static elaboration
+Starting simulation data flow analysis
+WARNING: [XSIM 43-4099] "/proj/primebuilds/9999.0_PRIME_0428_0031/installs/data/system_verilog/uvm_1.2/xlnx_uvm_package.sv" Line 4356. Module uvm_pkg doesn't have a timescale but at least one module in design has a timescale.
+Completed simulation data flow analysis
+Time Resolution for simulation is 1ps
+Compiling package std.standard
+Compiling package std.textio
+Compiling package ieee.std_logic_1164
+Compiling package ieee.numeric_std
+Compiling package floating_point_v7_1_21.floating_point_v7_1_21_viv_comp
+Compiling package xbip_utils_v3_0_15.xbip_utils_v3_0_15_pkg
+Compiling package axi_utils_v2_0_11.axi_utils_v2_0_11_pkg
+Compiling package floating_point_v7_1_21.floating_point_v7_1_21_consts
+Compiling package ieee.math_real
+Compiling package floating_point_v7_1_21.floating_point_v7_1_21_exp_table...
+Compiling package mult_gen_v12_0_24.mult_gen_v12_0_24_pkg
+Compiling package ieee.std_logic_arith
+Compiling package ieee.std_logic_signed
+Compiling package floating_point_v7_1_21.floating_point_v7_1_21_pkg
+Compiling package floating_point_v7_1_21.flt_utils
+Compiling package xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv_comp
+Compiling package unisim.vcomponents
+Compiling package ieee.vital_timing
+Compiling package ieee.vital_primitives
+Compiling package unisim.vpkg
+Compiling package xil_defaultlib.$unit_sv_module_top_sv
+Compiling package uvm.uvm_pkg
+Compiling package std.std
+Compiling package xil_defaultlib.svr_pkg
+Compiling package xil_defaultlib.file_agent_pkg
+Compiling package xil_defaultlib.predict_kernel_subsystem_pkg
+Compiling package xil_defaultlib.$unit_dataflow_monitor_sv
+Compiling module xil_defaultlib.predict_kernel_sparsemux_9_2_32_...
+Compiling module xil_defaultlib.predict_kernel_flow_control_loop...
+Compiling module xil_defaultlib.predict_kernel_predict_kernel_Pi...
+Compiling module xil_defaultlib.predict_kernel_predict_kernel_Pi...
+Compiling module xil_defaultlib.predict_kernel_predict_kernel_Pi...
+Compiling architecture muxcy_v of entity unisim.MUXCY [muxcy_default]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=7,length=0)\]
+Compiling architecture struct of entity floating_point_v7_1_21.carry_chain [\carry_chain(c_xdevicefamily="zy...]
+Compiling architecture synth of entity floating_point_v7_1_21.compare_eq_im [\compare_eq_im(c_xdevicefamily="...]
+Compiling architecture xorcy_v of entity unisim.XORCY [xorcy_default]
+Compiling architecture struct of entity floating_point_v7_1_21.carry_chain [\carry_chain(c_xdevicefamily="zy...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(length=0)\]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=24,length=0,fast_in...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=16,length=0)\]
+Compiling architecture dsp48e1_v of entity unisim.DSP48E1 [\DSP48E1(acascreg=0,adreg=0,alum...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=4,length=0)\]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=48,length=0)\]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=24,length=0)\]
+Compiling architecture rtl of entity floating_point_v7_1_21.dsp48e1_wrapper [\dsp48e1_wrapper(c_part="xck26-s...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=13,length=0)\]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=27,length=0)\]
+Compiling architecture synth of entity floating_point_v7_1_21.align_add_dsp48e1_sgl [\align_add_dsp48e1_sgl(c_xdevice...]
+Compiling architecture fdre_v of entity unisim.FDRE [fdre_default]
+Compiling architecture fde_v of entity unisim.FDE [fde_default]
+Compiling architecture lut5_v of entity unisim.LUT5 [\LUT5(init="00000000000000001111...]
+Compiling architecture lut5_v of entity unisim.LUT5 [\LUT5(init="00000000000000000000...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_latency...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=27)\]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_latency...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [delay_default]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=5,length=0)\]
+Compiling architecture rtl of entity floating_point_v7_1_21.lead_zero_encode_shift [\lead_zero_encode_shift(ab_fw=24...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_latency...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=4)\]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_latency...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=3)\]
+Compiling architecture lut6_v of entity unisim.LUT6 [\LUT6(init="11111110010101001011...]
+Compiling architecture lut5_v of entity unisim.LUT5 [\LUT5(init="00010001010111110000...]
+Compiling architecture lut5_v of entity unisim.LUT5 [\LUT5(init="11101110101000001111...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=2,length=0)\]
+Compiling architecture dsp48e1_v of entity unisim.DSP48E1 [\DSP48E1(acascreg=0,adreg=0,alum...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=25,length=0)\]
+Compiling architecture rtl of entity floating_point_v7_1_21.dsp48e1_wrapper [\dsp48e1_wrapper(a_width=24,c_wi...]
+Compiling architecture rtl of entity floating_point_v7_1_21.norm_and_round_dsp48e1_sgl [\norm_and_round_dsp48e1_sgl(c_mu...]
+Compiling architecture lut5_v of entity unisim.LUT5 [\LUT5(init="10011001100110011001...]
+Compiling architecture lut5_v of entity unisim.LUT5 [\LUT5(init="11111111000000001111...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=9,length=0)\]
+Compiling architecture struct of entity floating_point_v7_1_21.carry_chain [\carry_chain(c_xdevicefamily="zy...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=8,length=0)\]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=10,length=0)\]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=4,length=0,fast_inp...]
+Compiling architecture struct of entity floating_point_v7_1_21.carry_chain [\carry_chain(c_xdevicefamily="zy...]
+Compiling architecture synth of entity floating_point_v7_1_21.compare_eq_im [\compare_eq_im(c_xdevicefamily="...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_latency...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(fast_input=true)\]
+Compiling architecture rtl of entity floating_point_v7_1_21.special_detect [\special_detect(c_xdevicefamily=...]
+Compiling architecture struct of entity floating_point_v7_1_21.carry_chain [\carry_chain(c_xdevicefamily="zy...]
+Compiling architecture synth of entity floating_point_v7_1_21.compare_gt [\compare_gt(c_xdevicefamily="zyn...]
+Compiling architecture synth of entity floating_point_v7_1_21.compare [\compare(c_xdevicefamily="zynqup...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_latency...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=8)\]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_latency...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=9)\]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_latency...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=2,fast_input=true)\]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(length=0,fast_input=true)...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=2,length=0,fast_inp...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=12,length=0)\]
+Compiling architecture rtl of entity floating_point_v7_1_21.flt_add_exp_sp [\flt_add_exp_sp(c_xdevicefamily=...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_latency...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=23)\]
+Compiling architecture synth of entity floating_point_v7_1_21.flt_dec_op [\flt_dec_op(c_xdevicefamily="zyn...]
+Compiling architecture rtl of entity floating_point_v7_1_21.flt_add_dsp [\flt_add_dsp(c_xdevicefamily="zy...]
+Compiling architecture rtl of entity floating_point_v7_1_21.flt_add [\flt_add(c_xdevicefamily="zynqup...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_latency...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=32,length=0)\]
+Compiling architecture xilinx of entity floating_point_v7_1_21.floating_point_v7_1_21_viv [\floating_point_v7_1_21_viv(c_xd...]
+Compiling architecture xilinx of entity floating_point_v7_1_21.floating_point_v7_1_21 [\floating_point_v7_1_21(c_xdevic...]
+Compiling architecture predict_kernel_fadd_32ns_32ns_32_4_full_dsp_1_ip_arch of entity xil_defaultlib.predict_kernel_fadd_32ns_32ns_32_4_full_dsp_1_ip [predict_kernel_fadd_32ns_32ns_32...]
+Compiling module xil_defaultlib.predict_kernel_fadd_32ns_32ns_32...
+Compiling architecture dsp48e1_v of entity unisim.DSP48E1 [\DSP48E1(acascreg=0,adreg=0,alum...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=17,length=0)\]
+Compiling architecture rtl of entity floating_point_v7_1_21.dsp48e1_wrapper [\dsp48e1_wrapper(a_width=24,b_wi...]
+Compiling architecture dsp48e1_v of entity unisim.DSP48E1 [\DSP48E1(acascreg=0,adreg=0,alum...]
+Compiling architecture rtl of entity floating_point_v7_1_21.dsp48e1_wrapper [\dsp48e1_wrapper(a_width=24,b_wi...]
+Compiling architecture struct of entity floating_point_v7_1_21.fix_mult_dsp48e1_sgl [\fix_mult_dsp48e1_sgl(registers=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.fix_mult [\fix_mult(c_xdevicefamily="zynqu...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=8,length=0,fast_inp...]
+Compiling architecture struct of entity floating_point_v7_1_21.carry_chain [\carry_chain(c_xdevicefamily="zy...]
+Compiling architecture struct of entity floating_point_v7_1_21.carry_chain [\carry_chain(c_xdevicefamily="zy...]
+Compiling architecture synth of entity floating_point_v7_1_21.compare_eq_im [\compare_eq_im(c_xdevicefamily="...]
+Compiling architecture rtl of entity floating_point_v7_1_21.special_detect [\special_detect(c_xdevicefamily=...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=3,length=0,fast_inp...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=14,length=0)\]
+Compiling architecture rtl of entity floating_point_v7_1_21.flt_mult_exp [\flt_mult_exp(c_xdevicefamily="z...]
+Compiling architecture dsp48e1_v of entity unisim.DSP48E1 [\DSP48E1(acascreg=0,adreg=0,alum...]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=30,length=0)\]
+Compiling architecture synth of entity xbip_pipe_v3_0_11.xbip_pipe_v3_0_11_viv [\xbip_pipe_v3_0_11_viv(c_has_ce=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.delay [\delay(width=18,length=0)\]
+Compiling architecture rtl of entity floating_point_v7_1_21.dsp48e1_wrapper [\dsp48e1_wrapper(a_width=30,b_wi...]
+Compiling architecture struct of entity floating_point_v7_1_21.flt_round_dsp_opt_full [\flt_round_dsp_opt_full(c_xdevic...]
+Compiling architecture rtl of entity floating_point_v7_1_21.flt_mult_round [\flt_mult_round(c_xdevicefamily=...]
+Compiling architecture synth of entity floating_point_v7_1_21.flt_dec_op_lat [\flt_dec_op_lat(c_xdevicefamily=...]
+Compiling architecture rtl of entity floating_point_v7_1_21.flt_mult [\flt_mult(c_xdevicefamily="zynqu...]
+Compiling architecture xilinx of entity floating_point_v7_1_21.floating_point_v7_1_21_viv [\floating_point_v7_1_21_viv(c_xd...]
+Compiling architecture xilinx of entity floating_point_v7_1_21.floating_point_v7_1_21 [\floating_point_v7_1_21(c_xdevic...]
+Compiling architecture predict_kernel_fmul_32ns_32ns_32_3_max_dsp_1_ip_arch of entity xil_defaultlib.predict_kernel_fmul_32ns_32ns_32_3_max_dsp_1_ip [predict_kernel_fmul_32ns_32ns_32...]
+Compiling module xil_defaultlib.predict_kernel_fmul_32ns_32ns_32...
+Compiling module xil_defaultlib.predict_kernel
+Compiling module xil_defaultlib.misc_interface_default
+Compiling module xil_defaultlib.svr_if_default
+Compiling module xil_defaultlib.sv_module_top
+Compiling module xil_defaultlib.AESL_automem_H_x_0
+Compiling module xil_defaultlib.AESL_automem_H_x_1
+Compiling module xil_defaultlib.AESL_automem_H_x_2
+Compiling module xil_defaultlib.AESL_automem_H_x_3
+Compiling module xil_defaultlib.AESL_automem_A_0
+Compiling module xil_defaultlib.AESL_automem_A_1
+Compiling module xil_defaultlib.AESL_automem_A_2
+Compiling module xil_defaultlib.AESL_automem_A_3
+Compiling module xil_defaultlib.AESL_automem_H_w_0
+Compiling module xil_defaultlib.AESL_automem_H_w_1
+Compiling module xil_defaultlib.AESL_automem_H_w_2
+Compiling module xil_defaultlib.AESL_automem_H_w_3
+Compiling module xil_defaultlib.AESL_automem_H_pred_0
+Compiling module xil_defaultlib.AESL_automem_H_pred_1
+Compiling module xil_defaultlib.AESL_automem_H_pred_2
+Compiling module xil_defaultlib.AESL_automem_H_pred_3
+Compiling module xil_defaultlib.nodf_module_intf_default
+Compiling module xil_defaultlib.upc_loop_intf(FSM_WIDTH=1)
+Compiling module xil_defaultlib.dataflow_monitor_1
+Compiling module xil_defaultlib.apatb_predict_kernel_top
+Compiling module xil_defaultlib.glbl
+Built simulation snapshot predict_kernel
+
+****** xsim v2025.2 (64-bit)
+  **** SW Build 6299465 on Fri Nov 14 12:34:56 MST 2025
+  **** IP Build 6300035 on Fri Nov 14 10:48:45 MST 2025
+  **** SharedData Build 6298862 on Thu Nov 13 04:50:51 MST 2025
+  **** Start of session at: Mon Mar  2 15:43:05 2026
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source xsim.dir/predict_kernel/xsim_script.tcl
+# xsim {predict_kernel} -testplusarg UVM_VERBOSITY=UVM_NONE -testplusarg UVM_TESTNAME=predict_kernel_test_lib -testplusarg UVM_TIMEOUT=20000000000000 -autoloadwcfg -tclbatch {predict_kernel.tcl}
+Time resolution is 1 ps
+source predict_kernel.tcl
+## run all
+UVM_INFO /opt/Xilinx/2025.2/Vivado/data/system_verilog/uvm_1.2/xlnx_uvm_package.sv(18601) @ 0: reporter [UVM/RELNOTES] 
+----------------------------------------------------------------
+UVM-1.2
+(C) 2007-2014 Mentor Graphics Corporation
+(C) 2007-2014 Cadence Design Systems, Inc.
+(C) 2006-2014 Synopsys, Inc.
+(C) 2011-2013 Cypress Semiconductor Corp.
+(C) 2013-2014 NVIDIA Corporation
+----------------------------------------------------------------
+
+  ***********       IMPORTANT RELEASE NOTES         ************
+
+  You are using a version of the UVM library that has been compiled
+  with `UVM_NO_DEPRECATED undefined.
+
+  You are using a version of the UVM library that has been compiled
+  with `UVM_OBJECT_DO_NOT_NEED_CONSTRUCTOR undefined.
+
+      (Specify +UVM_NO_RELNOTES to turn off this notice)
+
+UVM_INFO /opt/Xilinx/2025.2/Vivado/data/system_verilog/uvm_1.2/xlnx_uvm_package.sv(18648) @ 0: reporter [NO_DPI_TSTNAME] UVM_NO_DPI defined--getting UVM_TESTNAME directly, without DPI
+UVM_INFO /opt/Xilinx/2025.2/Vivado/data/system_verilog/uvm_1.2/xlnx_uvm_package.sv(18752) @ 0: reporter [UVMTOP] UVM testbench topology:
+--------------------------------------------------------------------------------------------------------------
+Name                                               Type                                 Size  Value           
+--------------------------------------------------------------------------------------------------------------
+uvm_test_top                                       predict_kernel_test_lib              -     @362            
+  top_env                                          predict_kernel_env                   -     @373            
+    env_master_svr_m_w                             uvm_env                              -     @511            
+      m_agt                                        uvm_agent                            -     @881            
+        drv                                        uvm_driver #(REQ,RSP)                -     @1029           
+          rsp_port                                 uvm_analysis_port                    -     @1048           
+          seq_item_port                            uvm_seq_item_pull_port               -     @1038           
+        mon                                        uvm_monitor                          -     @1058           
+          item_collect_port                        uvm_analysis_port                    -     @1069           
+        sqr                                        uvm_sequencer                        -     @892            
+          rsp_export                               uvm_analysis_export                  -     @901            
+          seq_item_export                          uvm_seq_item_pull_imp                -     @1019           
+          arbitration_queue                        array                                0     -               
+          lock_queue                               array                                0     -               
+          num_last_reqs                            integral                             32    'd1             
+          num_last_rsps                            integral                             32    'd1             
+    env_master_svr_m_x                             uvm_env                              -     @461            
+      m_agt                                        uvm_agent                            -     @1087           
+        drv                                        uvm_driver #(REQ,RSP)                -     @1235           
+          rsp_port                                 uvm_analysis_port                    -     @1254           
+          seq_item_port                            uvm_seq_item_pull_port               -     @1244           
+        mon                                        uvm_monitor                          -     @1264           
+          item_collect_port                        uvm_analysis_port                    -     @1275           
+        sqr                                        uvm_sequencer                        -     @1098           
+          rsp_export                               uvm_analysis_export                  -     @1107           
+          seq_item_export                          uvm_seq_item_pull_imp                -     @1225           
+          arbitration_queue                        array                                0     -               
+          lock_queue                               array                                0     -               
+          num_last_reqs                            integral                             32    'd1             
+          num_last_rsps                            integral                             32    'd1             
+    env_master_svr_p_w_0                           uvm_env                              -     @471            
+      m_agt                                        uvm_agent                            -     @1293           
+        drv                                        uvm_driver #(REQ,RSP)                -     @1441           
+          rsp_port                                 uvm_analysis_port                    -     @1460           
+          seq_item_port                            uvm_seq_item_pull_port               -     @1450           
+        mon                                        uvm_monitor                          -     @1470           
+          item_collect_port                        uvm_analysis_port                    -     @1481           
+        sqr                                        uvm_sequencer                        -     @1304           
+          rsp_export                               uvm_analysis_export                  -     @1313           
+          seq_item_export                          uvm_seq_item_pull_imp                -     @1431           
+          arbitration_queue                        array                                0     -               
+          lock_queue                               array                                0     -               
+          num_last_reqs                            integral                             32    'd1             
+          num_last_rsps                            integral                             32    'd1             
+    env_master_svr_p_w_1                           uvm_env                              -     @481            
+      m_agt                                        uvm_agent                            -     @1499           
+        drv                                        uvm_driver #(REQ,RSP)                -     @1647           
+          rsp_port                                 uvm_analysis_port                    -     @1666           
+          seq_item_port                            uvm_seq_item_pull_port               -     @1656           
+        mon                                        uvm_monitor                          -     @1676           
+          item_collect_port                        uvm_analysis_port                    -     @1687           
+        sqr                                        uvm_sequencer                        -     @1510           
+          rsp_export                               uvm_analysis_export                  -     @1519           
+          seq_item_export                          uvm_seq_item_pull_imp                -     @1637           
+          arbitration_queue                        array                                0     -               
+          lock_queue                               array                                0     -               
+          num_last_reqs                            integral                             32    'd1             
+          num_last_rsps                            integral                             32    'd1             
+    env_master_svr_p_w_2                           uvm_env                              -     @491            
+      m_agt                                        uvm_agent                            -     @1705           
+        drv                                        uvm_driver #(REQ,RSP)                -     @1853           
+          rsp_port                                 uvm_analysis_port                    -     @1872           
+          seq_item_port                            uvm_seq_item_pull_port               -     @1862           
+        mon                                        uvm_monitor                          -     @1882           
+          item_collect_port                        uvm_analysis_port                    -     @1893           
+        sqr                                        uvm_sequencer                        -     @1716           
+          rsp_export                               uvm_analysis_export                  -     @1725           
+          seq_item_export                          uvm_seq_item_pull_imp                -     @1843           
+          arbitration_queue                        array                                0     -               
+          lock_queue                               array                                0     -               
+          num_last_reqs                            integral                             32    'd1             
+          num_last_rsps                            integral                             32    'd1             
+    env_master_svr_p_w_3                           uvm_env                              -     @501            
+      m_agt                                        uvm_agent                            -     @1911           
+        drv                                        uvm_driver #(REQ,RSP)                -     @2059           
+          rsp_port                                 uvm_analysis_port                    -     @2078           
+          seq_item_port                            uvm_seq_item_pull_port               -     @2068           
+        mon                                        uvm_monitor                          -     @2088           
+          item_collect_port                        uvm_analysis_port                    -     @2099           
+        sqr                                        uvm_sequencer                        -     @1922           
+          rsp_export                               uvm_analysis_export                  -     @1931           
+          seq_item_export                          uvm_seq_item_pull_imp                -     @2049           
+          arbitration_queue                        array                                0     -               
+          lock_queue                               array                                0     -               
+          num_last_reqs                            integral                             32    'd1             
+          num_last_rsps                            integral                             32    'd1             
+    env_master_svr_p_x_0                           uvm_env                              -     @418            
+      m_agt                                        uvm_agent                            -     @2117           
+        drv                                        uvm_driver #(REQ,RSP)                -     @2265           
+          rsp_port                                 uvm_analysis_port                    -     @2284           
+          seq_item_port                            uvm_seq_item_pull_port               -     @2274           
+        mon                                        uvm_monitor                          -     @2294           
+          item_collect_port                        uvm_analysis_port                    -     @2305           
+        sqr                                        uvm_sequencer                        -     @2128           
+          rsp_export                               uvm_analysis_export                  -     @2137           
+          seq_item_export                          uvm_seq_item_pull_imp                -     @2255           
+          arbitration_queue                        array                                0     -               
+          lock_queue                               array                                0     -               
+          num_last_reqs                            integral                             32    'd1             
+          num_last_rsps                            integral                             32    'd1             
+    env_master_svr_p_x_1                           uvm_env                              -     @431            
+      m_agt                                        uvm_agent                            -     @2323           
+        drv                                        uvm_driver #(REQ,RSP)                -     @2471           
+          rsp_port                                 uvm_analysis_port                    -     @2490           
+          seq_item_port                            uvm_seq_item_pull_port               -     @2480           
+        mon                                        uvm_monitor                          -     @2500           
+          item_collect_port                        uvm_analysis_port                    -     @2511           
+        sqr                                        uvm_sequencer                        -     @2334           
+          rsp_export                               uvm_analysis_export                  -     @2343           
+          seq_item_export                          uvm_seq_item_pull_imp                -     @2461           
+          arbitration_queue                        array                                0     -               
+          lock_queue                               array                                0     -               
+          num_last_reqs                            integral                             32    'd1             
+          num_last_rsps                            integral                             32    'd1             
+    env_master_svr_p_x_2                           uvm_env                              -     @441            
+      m_agt                                        uvm_agent                            -     @2529           
+        drv                                        uvm_driver #(REQ,RSP)                -     @2677           
+          rsp_port                                 uvm_analysis_port                    -     @2696           
+          seq_item_port                            uvm_seq_item_pull_port               -     @2686           
+        mon                                        uvm_monitor                          -     @2706           
+          item_collect_port                        uvm_analysis_port                    -     @2717           
+        sqr                                        uvm_sequencer                        -     @2540           
+          rsp_export                               uvm_analysis_export                  -     @2549           
+          seq_item_export                          uvm_seq_item_pull_imp                -     @2667           
+          arbitration_queue                        array                                0     -               
+          lock_queue                               array                                0     -               
+          num_last_reqs                            integral                             32    'd1             
+          num_last_rsps                            integral                             32    'd1             
+    env_master_svr_p_x_3                           uvm_env                              -     @451            
+      m_agt                                        uvm_agent                            -     @2735           
+        drv                                        uvm_driver #(REQ,RSP)                -     @2883           
+          rsp_port                                 uvm_analysis_port                    -     @2902           
+          seq_item_port                            uvm_seq_item_pull_port               -     @2892           
+        mon                                        uvm_monitor                          -     @2912           
+          item_collect_port                        uvm_analysis_port                    -     @2923           
+        sqr                                        uvm_sequencer                        -     @2746           
+          rsp_export                               uvm_analysis_export                  -     @2755           
+          seq_item_export                          uvm_seq_item_pull_imp                -     @2873           
+          arbitration_queue                        array                                0     -               
+          lock_queue                               array                                0     -               
+          num_last_reqs                            integral                             32    'd1             
+          num_last_rsps                            integral                             32    'd1             
+    env_slave_svr_m_pred                           uvm_env                              -     @561            
+      s_agt                                        uvm_agent                            -     @2941           
+        drv                                        uvm_driver #(REQ,RSP)                -     @3089           
+          rsp_port                                 uvm_analysis_port                    -     @3108           
+          seq_item_port                            uvm_seq_item_pull_port               -     @3098           
+        mon                                        uvm_monitor                          -     @3118           
+          item_collect_port                        uvm_analysis_port                    -     @3129           
+        sqr                                        uvm_sequencer                        -     @2952           
+          rsp_export                               uvm_analysis_export                  -     @2961           
+          seq_item_export                          uvm_seq_item_pull_imp                -     @3079           
+          arbitration_queue                        array                                0     -               
+          lock_queue                               array                                0     -               
+          num_last_reqs                            integral                             32    'd1             
+          num_last_rsps                            integral                             32    'd1             
+    env_slave_svr_p_pred_0                         uvm_env                              -     @521            
+      s_agt                                        uvm_agent                            -     @3147           
+        drv                                        uvm_driver #(REQ,RSP)                -     @3295           
+          rsp_port                                 uvm_analysis_port                    -     @3314           
+          seq_item_port                            uvm_seq_item_pull_port               -     @3304           
+        mon                                        uvm_monitor                          -     @3324           
+          item_collect_port                        uvm_analysis_port                    -     @3335           
+        sqr                                        uvm_sequencer                        -     @3158           
+          rsp_export                               uvm_analysis_export                  -     @3167           
+          seq_item_export                          uvm_seq_item_pull_imp                -     @3285           
+          arbitration_queue                        array                                0     -               
+          lock_queue                               array                                0     -               
+          num_last_reqs                            integral                             32    'd1             
+          num_last_rsps                            integral                             32    'd1             
+    env_slave_svr_p_pred_1                         uvm_env                              -     @531            
+      s_agt                                        uvm_agent                            -     @3353           
+        drv                                        uvm_driver #(REQ,RSP)                -     @3501           
+          rsp_port                                 uvm_analysis_port                    -     @3520           
+          seq_item_port                            uvm_seq_item_pull_port               -     @3510           
+        mon                                        uvm_monitor                          -     @3530           
+          item_collect_port                        uvm_analysis_port                    -     @3541           
+        sqr                                        uvm_sequencer                        -     @3364           
+          rsp_export                               uvm_analysis_export                  -     @3373           
+          seq_item_export                          uvm_seq_item_pull_imp                -     @3491           
+          arbitration_queue                        array                                0     -               
+          lock_queue                               array                                0     -               
+          num_last_reqs                            integral                             32    'd1             
+          num_last_rsps                            integral                             32    'd1             
+    env_slave_svr_p_pred_2                         uvm_env                              -     @541            
+      s_agt                                        uvm_agent                            -     @3559           
+        drv                                        uvm_driver #(REQ,RSP)                -     @3707           
+          rsp_port                                 uvm_analysis_port                    -     @3726           
+          seq_item_port                            uvm_seq_item_pull_port               -     @3716           
+        mon                                        uvm_monitor                          -     @3736           
+          item_collect_port                        uvm_analysis_port                    -     @3747           
+        sqr                                        uvm_sequencer                        -     @3570           
+          rsp_export                               uvm_analysis_export                  -     @3579           
+          seq_item_export                          uvm_seq_item_pull_imp                -     @3697           
+          arbitration_queue                        array                                0     -               
+          lock_queue                               array                                0     -               
+          num_last_reqs                            integral                             32    'd1             
+          num_last_rsps                            integral                             32    'd1             
+    env_slave_svr_p_pred_3                         uvm_env                              -     @551            
+      s_agt                                        uvm_agent                            -     @3765           
+        drv                                        uvm_driver #(REQ,RSP)                -     @3913           
+          rsp_port                                 uvm_analysis_port                    -     @3932           
+          seq_item_port                            uvm_seq_item_pull_port               -     @3922           
+        mon                                        uvm_monitor                          -     @3942           
+          item_collect_port                        uvm_analysis_port                    -     @3953           
+        sqr                                        uvm_sequencer                        -     @3776           
+          rsp_export                               uvm_analysis_export                  -     @3785           
+          seq_item_export                          uvm_seq_item_pull_imp                -     @3903           
+          arbitration_queue                        array                                0     -               
+          lock_queue                               array                                0     -               
+          num_last_reqs                            integral                             32    'd1             
+          num_last_rsps                            integral                             32    'd1             
+    predict_kernel_virtual_sqr                     predict_kernel_virtual_sequencer     -     @743            
+      rsp_export                                   uvm_analysis_export                  -     @752            
+      seq_item_export                              uvm_seq_item_pull_imp                -     @870            
+      arbitration_queue                            array                                0     -               
+      lock_queue                                   array                                0     -               
+      num_last_reqs                                integral                             32    'd1             
+      num_last_rsps                                integral                             32    'd1             
+    refm                                           predict_kernel_reference_model       -     @571            
+      trans_num_idx                                integral                             32    'h0             
+    subsys_mon                                     predict_kernel_subsystem_monitor     -     @584            
+      scbd                                         predict_kernel_scoreboard            -     @3980           
+        refm                                       predict_kernel_reference_model       -     @571            
+          trans_num_idx                            integral                             32    'h0             
+        TVOUT_transaction_size_queue               da(integral)                         0     -               
+        file_wr_port_p_pred_0_p_pred_0             <unknown>                            -     @3990           
+          TV_FILE                                  string                               0     ""              
+          fp                                       integral                             32    'hxxxxxxxx      
+          file_open                                integral                             32    'h0             
+          write_file_done                          integral                             32    'h0             
+          write_section_done                       integral                             32    'h0             
+          TRANSACTION_NUM                          integral                             32    'h0             
+          transaction_num_idx                      integral                             32    'h0             
+          TRANSACTION_DEPTH                        integral                             32    'h0             
+          TRANSACTION_DEPTH_queue                  da(integral)                         0     -               
+          TRANSACTION_DEPTH_queue_for_depth_check  da(integral)                         0     -               
+          transaction_depth_idx                    integral                             32    'h0             
+          ap_done_num_idx                          integral                             32    'h0             
+          is_binary                                integral                             32    'h0             
+        write_file_done_p_pred_0_p_pred_0          integral                             32    'h0             
+        write_section_done_p_pred_0_p_pred_0       integral                             32    'h0             
+        file_wr_port_p_pred_1_p_pred_1             <unknown>                            -     @3991           
+          TV_FILE                                  string                               0     ""              
+          fp                                       integral                             32    'hxxxxxxxx      
+          file_open                                integral                             32    'h0             
+          write_file_done                          integral                             32    'h0             
+          write_section_done                       integral                             32    'h0             
+          TRANSACTION_NUM                          integral                             32    'h0             
+          transaction_num_idx                      integral                             32    'h0             
+          TRANSACTION_DEPTH                        integral                             32    'h0             
+          TRANSACTION_DEPTH_queue                  da(integral)                         0     -               
+          TRANSACTION_DEPTH_queue_for_depth_check  da(integral)                         0     -               
+          transaction_depth_idx                    integral                             32    'h0             
+          ap_done_num_idx                          integral                             32    'h0             
+          is_binary                                integral                             32    'h0             
+        write_file_done_p_pred_1_p_pred_1          integral                             32    'h0             
+        write_section_done_p_pred_1_p_pred_1       integral                             32    'h0             
+        file_wr_port_p_pred_2_p_pred_2             <unknown>                            -     @3992           
+          TV_FILE                                  string                               0     ""              
+          fp                                       integral                             32    'hxxxxxxxx      
+          file_open                                integral                             32    'h0             
+          write_file_done                          integral                             32    'h0             
+          write_section_done                       integral                             32    'h0             
+          TRANSACTION_NUM                          integral                             32    'h0             
+          transaction_num_idx                      integral                             32    'h0             
+          TRANSACTION_DEPTH                        integral                             32    'h0             
+          TRANSACTION_DEPTH_queue                  da(integral)                         0     -               
+          TRANSACTION_DEPTH_queue_for_depth_check  da(integral)                         0     -               
+          transaction_depth_idx                    integral                             32    'h0             
+          ap_done_num_idx                          integral                             32    'h0             
+          is_binary                                integral                             32    'h0             
+        write_file_done_p_pred_2_p_pred_2          integral                             32    'h0             
+        write_section_done_p_pred_2_p_pred_2       integral                             32    'h0             
+        file_wr_port_p_pred_3_p_pred_3             <unknown>                            -     @3993           
+          TV_FILE                                  string                               0     ""              
+          fp                                       integral                             32    'hxxxxxxxx      
+          file_open                                integral                             32    'h0             
+          write_file_done                          integral                             32    'h0             
+          write_section_done                       integral                             32    'h0             
+          TRANSACTION_NUM                          integral                             32    'h0             
+          transaction_num_idx                      integral                             32    'h0             
+          TRANSACTION_DEPTH                        integral                             32    'h0             
+          TRANSACTION_DEPTH_queue                  da(integral)                         0     -               
+          TRANSACTION_DEPTH_queue_for_depth_check  da(integral)                         0     -               
+          transaction_depth_idx                    integral                             32    'h0             
+          ap_done_num_idx                          integral                             32    'h0             
+          is_binary                                integral                             32    'h0             
+        write_file_done_p_pred_3_p_pred_3          integral                             32    'h0             
+        write_section_done_p_pred_3_p_pred_3       integral                             32    'h0             
+        file_wr_port_m_pred_m_pred                 <unknown>                            -     @3994           
+          TV_FILE                                  string                               0     ""              
+          fp                                       integral                             32    'hxxxxxxxx      
+          file_open                                integral                             32    'h0             
+          write_file_done                          integral                             32    'h0             
+          write_section_done                       integral                             32    'h0             
+          TRANSACTION_NUM                          integral                             32    'h0             
+          transaction_num_idx                      integral                             32    'h0             
+          TRANSACTION_DEPTH                        integral                             32    'h0             
+          TRANSACTION_DEPTH_queue                  da(integral)                         0     -               
+          TRANSACTION_DEPTH_queue_for_depth_check  da(integral)                         0     -               
+          transaction_depth_idx                    integral                             32    'h0             
+          ap_done_num_idx                          integral                             32    'h0             
+          is_binary                                integral                             32    'h0             
+        write_file_done_m_pred_m_pred              integral                             32    'h0             
+        write_section_done_m_pred_m_pred           integral                             32    'h0             
+      svr_master_m_w_imp                           uvm_analysis_imp_svr_master_m_w      -     @683            
+      svr_master_m_x_imp                           uvm_analysis_imp_svr_master_m_x      -     @633            
+      svr_master_p_w_0_imp                         uvm_analysis_imp_svr_master_p_w_0    -     @643            
+      svr_master_p_w_1_imp                         uvm_analysis_imp_svr_master_p_w_1    -     @653            
+      svr_master_p_w_2_imp                         uvm_analysis_imp_svr_master_p_w_2    -     @663            
+      svr_master_p_w_3_imp                         uvm_analysis_imp_svr_master_p_w_3    -     @673            
+      svr_master_p_x_0_imp                         uvm_analysis_imp_svr_master_p_x_0    -     @593            
+      svr_master_p_x_1_imp                         uvm_analysis_imp_svr_master_p_x_1    -     @603            
+      svr_master_p_x_2_imp                         uvm_analysis_imp_svr_master_p_x_2    -     @613            
+      svr_master_p_x_3_imp                         uvm_analysis_imp_svr_master_p_x_3    -     @623            
+      svr_slave_m_pred_imp                         uvm_analysis_imp_svr_slave_m_pred    -     @733            
+      svr_slave_p_pred_0_imp                       uvm_analysis_imp_svr_slave_p_pred_0  -     @693            
+      svr_slave_p_pred_1_imp                       uvm_analysis_imp_svr_slave_p_pred_1  -     @703            
+      svr_slave_p_pred_2_imp                       uvm_analysis_imp_svr_slave_p_pred_2  -     @713            
+      svr_slave_p_pred_3_imp                       uvm_analysis_imp_svr_slave_p_pred_3  -     @723            
+    env_master_svr_p_x_0                           uvm_env                              -     @418            
+    env_master_svr_p_x_1                           uvm_env                              -     @431            
+    env_master_svr_p_x_2                           uvm_env                              -     @441            
+    env_master_svr_p_x_3                           uvm_env                              -     @451            
+    env_master_svr_m_x                             uvm_env                              -     @461            
+    env_master_svr_p_w_0                           uvm_env                              -     @471            
+    env_master_svr_p_w_1                           uvm_env                              -     @481            
+    env_master_svr_p_w_2                           uvm_env                              -     @491            
+    env_master_svr_p_w_3                           uvm_env                              -     @501            
+    env_master_svr_m_w                             uvm_env                              -     @511            
+    env_slave_svr_p_pred_0                         uvm_env                              -     @521            
+    env_slave_svr_p_pred_1                         uvm_env                              -     @531            
+    env_slave_svr_p_pred_2                         uvm_env                              -     @541            
+    env_slave_svr_p_pred_3                         uvm_env                              -     @551            
+    env_slave_svr_m_pred                           uvm_env                              -     @561            
+    refm                                           predict_kernel_reference_model       -     @571            
+    predict_kernel_virtual_sqr                     predict_kernel_virtual_sequencer     -     @743            
+    predict_kernel_cfg                             predict_kernel_config                -     @387            
+      port_p_x_0_cfg                               svr_config                           -     @388            
+        svr_type                                   svr_inst_type                        32    SVR_MASTER      
+        prt_type                                   svr_protocol_type                    32    AP_NONE         
+        is_active                                  svr_active_passive_enum              1     SVR_ACTIVE      
+        reset_level                                svr_reset_level_enum                 1     RESET_LEVEL_HIGH
+        spec_cfg                                   svr_spec_cfg_enum                    32    NORMAL          
+        clatency                                   svr_latency                          -     @389            
+          transfer_latency                         integral                             32    'h0             
+      port_p_x_1_cfg                               svr_config                           -     @390            
+        svr_type                                   svr_inst_type                        32    SVR_MASTER      
+        prt_type                                   svr_protocol_type                    32    AP_NONE         
+        is_active                                  svr_active_passive_enum              1     SVR_ACTIVE      
+        reset_level                                svr_reset_level_enum                 1     RESET_LEVEL_HIGH
+        spec_cfg                                   svr_spec_cfg_enum                    32    NORMAL          
+        clatency                                   svr_latency                          -     @391            
+          transfer_latency                         integral                             32    'h0             
+      port_p_x_2_cfg                               svr_config                           -     @392            
+        svr_type                                   svr_inst_type                        32    SVR_MASTER      
+        prt_type                                   svr_protocol_type                    32    AP_NONE         
+        is_active                                  svr_active_passive_enum              1     SVR_ACTIVE      
+        reset_level                                svr_reset_level_enum                 1     RESET_LEVEL_HIGH
+        spec_cfg                                   svr_spec_cfg_enum                    32    NORMAL          
+        clatency                                   svr_latency                          -     @393            
+          transfer_latency                         integral                             32    'h0             
+      port_p_x_3_cfg                               svr_config                           -     @394            
+        svr_type                                   svr_inst_type                        32    SVR_MASTER      
+        prt_type                                   svr_protocol_type                    32    AP_NONE         
+        is_active                                  svr_active_passive_enum              1     SVR_ACTIVE      
+        reset_level                                svr_reset_level_enum                 1     RESET_LEVEL_HIGH
+        spec_cfg                                   svr_spec_cfg_enum                    32    NORMAL          
+        clatency                                   svr_latency                          -     @395            
+          transfer_latency                         integral                             32    'h0             
+      port_m_x_cfg                                 svr_config                           -     @396            
+        svr_type                                   svr_inst_type                        32    SVR_MASTER      
+        prt_type                                   svr_protocol_type                    32    AP_NONE         
+        is_active                                  svr_active_passive_enum              1     SVR_ACTIVE      
+        reset_level                                svr_reset_level_enum                 1     RESET_LEVEL_HIGH
+        spec_cfg                                   svr_spec_cfg_enum                    32    NORMAL          
+        clatency                                   svr_latency                          -     @397            
+          transfer_latency                         integral                             32    'h0             
+      port_p_w_0_cfg                               svr_config                           -     @398            
+        svr_type                                   svr_inst_type                        32    SVR_MASTER      
+        prt_type                                   svr_protocol_type                    32    AP_NONE         
+        is_active                                  svr_active_passive_enum              1     SVR_ACTIVE      
+        reset_level                                svr_reset_level_enum                 1     RESET_LEVEL_HIGH
+        spec_cfg                                   svr_spec_cfg_enum                    32    NORMAL          
+        clatency                                   svr_latency                          -     @399            
+          transfer_latency                         integral                             32    'h0             
+      port_p_w_1_cfg                               svr_config                           -     @400            
+        svr_type                                   svr_inst_type                        32    SVR_MASTER      
+        prt_type                                   svr_protocol_type                    32    AP_NONE         
+        is_active                                  svr_active_passive_enum              1     SVR_ACTIVE      
+        reset_level                                svr_reset_level_enum                 1     RESET_LEVEL_HIGH
+        spec_cfg                                   svr_spec_cfg_enum                    32    NORMAL          
+        clatency                                   svr_latency                          -     @401            
+          transfer_latency                         integral                             32    'h0             
+      port_p_w_2_cfg                               svr_config                           -     @402            
+        svr_type                                   svr_inst_type                        32    SVR_MASTER      
+        prt_type                                   svr_protocol_type                    32    AP_NONE         
+        is_active                                  svr_active_passive_enum              1     SVR_ACTIVE      
+        reset_level                                svr_reset_level_enum                 1     RESET_LEVEL_HIGH
+        spec_cfg                                   svr_spec_cfg_enum                    32    NORMAL          
+        clatency                                   svr_latency                          -     @403            
+          transfer_latency                         integral                             32    'h0             
+      port_p_w_3_cfg                               svr_config                           -     @404            
+        svr_type                                   svr_inst_type                        32    SVR_MASTER      
+        prt_type                                   svr_protocol_type                    32    AP_NONE         
+        is_active                                  svr_active_passive_enum              1     SVR_ACTIVE      
+        reset_level                                svr_reset_level_enum                 1     RESET_LEVEL_HIGH
+        spec_cfg                                   svr_spec_cfg_enum                    32    NORMAL          
+        clatency                                   svr_latency                          -     @405            
+          transfer_latency                         integral                             32    'h0             
+      port_m_w_cfg                                 svr_config                           -     @406            
+        svr_type                                   svr_inst_type                        32    SVR_MASTER      
+        prt_type                                   svr_protocol_type                    32    AP_NONE         
+        is_active                                  svr_active_passive_enum              1     SVR_ACTIVE      
+        reset_level                                svr_reset_level_enum                 1     RESET_LEVEL_HIGH
+        spec_cfg                                   svr_spec_cfg_enum                    32    NORMAL          
+        clatency                                   svr_latency                          -     @407            
+          transfer_latency                         integral                             32    'h0             
+      port_p_pred_0_cfg                            svr_config                           -     @408            
+        svr_type                                   svr_inst_type                        32    SVR_SLAVE       
+        prt_type                                   svr_protocol_type                    32    AP_VLD          
+        is_active                                  svr_active_passive_enum              1     SVR_ACTIVE      
+        reset_level                                svr_reset_level_enum                 1     RESET_LEVEL_HIGH
+        spec_cfg                                   svr_spec_cfg_enum                    32    NORMAL          
+        clatency                                   svr_latency                          -     @409            
+          transfer_latency                         integral                             32    'h0             
+      port_p_pred_1_cfg                            svr_config                           -     @410            
+        svr_type                                   svr_inst_type                        32    SVR_SLAVE       
+        prt_type                                   svr_protocol_type                    32    AP_VLD          
+        is_active                                  svr_active_passive_enum              1     SVR_ACTIVE      
+        reset_level                                svr_reset_level_enum                 1     RESET_LEVEL_HIGH
+        spec_cfg                                   svr_spec_cfg_enum                    32    NORMAL          
+        clatency                                   svr_latency                          -     @411            
+          transfer_latency                         integral                             32    'h0             
+      port_p_pred_2_cfg                            svr_config                           -     @412            
+        svr_type                                   svr_inst_type                        32    SVR_SLAVE       
+        prt_type                                   svr_protocol_type                    32    AP_VLD          
+        is_active                                  svr_active_passive_enum              1     SVR_ACTIVE      
+        reset_level                                svr_reset_level_enum                 1     RESET_LEVEL_HIGH
+        spec_cfg                                   svr_spec_cfg_enum                    32    NORMAL          
+        clatency                                   svr_latency                          -     @413            
+          transfer_latency                         integral                             32    'h0             
+      port_p_pred_3_cfg                            svr_config                           -     @414            
+        svr_type                                   svr_inst_type                        32    SVR_SLAVE       
+        prt_type                                   svr_protocol_type                    32    AP_VLD          
+        is_active                                  svr_active_passive_enum              1     SVR_ACTIVE      
+        reset_level                                svr_reset_level_enum                 1     RESET_LEVEL_HIGH
+        spec_cfg                                   svr_spec_cfg_enum                    32    NORMAL          
+        clatency                                   svr_latency                          -     @415            
+          transfer_latency                         integral                             32    'h0             
+      port_m_pred_cfg                              svr_config                           -     @416            
+        svr_type                                   svr_inst_type                        32    SVR_SLAVE       
+        prt_type                                   svr_protocol_type                    32    AP_VLD          
+        is_active                                  svr_active_passive_enum              1     SVR_ACTIVE      
+        reset_level                                svr_reset_level_enum                 1     RESET_LEVEL_HIGH
+        spec_cfg                                   svr_spec_cfg_enum                    32    NORMAL          
+        clatency                                   svr_latency                          -     @417            
+          transfer_latency                         integral                             32    'h0             
+      check_ena                                    integral                             32    'h0             
+      cover_ena                                    integral                             32    'h0             
+--------------------------------------------------------------------------------------------------------------
+
+UVM_INFO /opt/Xilinx/2025.2/Vivado/data/system_verilog/uvm_1.2/xlnx_uvm_package.sv(20867) @ 0: reporter [UVM/COMP/NAMECHECK] This implementation of the component name checks requires DPI to be enabled
+////////////////////////////////////////////////////////////////////////////////////
+// Inter-Transaction Progress: Completed Transaction / Total Transaction
+// Intra-Transaction Progress: Measured Latency / Latency Estimation * 100%
+//
+// RTL Simulation : "Inter-Transaction Progress" ["Intra-Transaction Progress"] @ "Simulation Time"
+////////////////////////////////////////////////////////////////////////////////////
+// RTL Simulation : 0 / 60 [0.00%] @ "125000"
+// RTL Simulation : 1 / 60 [100.00%] @ "935000"
+// RTL Simulation : 2 / 60 [100.00%] @ "2035000"
+// RTL Simulation : 3 / 60 [100.00%] @ "3135000"
+// RTL Simulation : 4 / 60 [100.00%] @ "4235000"
+// RTL Simulation : 5 / 60 [100.00%] @ "5335000"
+// RTL Simulation : 6 / 60 [100.00%] @ "6435000"
+// RTL Simulation : 7 / 60 [100.00%] @ "7535000"
+// RTL Simulation : 8 / 60 [100.00%] @ "8635000"
+// RTL Simulation : 9 / 60 [100.00%] @ "9735000"
+// RTL Simulation : 10 / 60 [100.00%] @ "10835000"
+// RTL Simulation : 11 / 60 [100.00%] @ "11935000"
+// RTL Simulation : 12 / 60 [100.00%] @ "13035000"
+// RTL Simulation : 13 / 60 [100.00%] @ "14135000"
+// RTL Simulation : 14 / 60 [100.00%] @ "15235000"
+// RTL Simulation : 15 / 60 [100.00%] @ "16335000"
+// RTL Simulation : 16 / 60 [100.00%] @ "17115000"
+// RTL Simulation : 17 / 60 [100.00%] @ "18215000"
+// RTL Simulation : 18 / 60 [100.00%] @ "19315000"
+// RTL Simulation : 19 / 60 [100.00%] @ "20415000"
+// RTL Simulation : 20 / 60 [100.00%] @ "21515000"
+// RTL Simulation : 21 / 60 [100.00%] @ "22615000"
+// RTL Simulation : 22 / 60 [100.00%] @ "23715000"
+// RTL Simulation : 23 / 60 [100.00%] @ "24815000"
+// RTL Simulation : 24 / 60 [100.00%] @ "25915000"
+// RTL Simulation : 25 / 60 [100.00%] @ "27015000"
+// RTL Simulation : 26 / 60 [100.00%] @ "28115000"
+// RTL Simulation : 27 / 60 [100.00%] @ "29215000"
+// RTL Simulation : 28 / 60 [100.00%] @ "30315000"
+// RTL Simulation : 29 / 60 [100.00%] @ "31415000"
+// RTL Simulation : 30 / 60 [100.00%] @ "32515000"
+// RTL Simulation : 31 / 60 [100.00%] @ "33295000"
+// RTL Simulation : 32 / 60 [100.00%] @ "34395000"
+// RTL Simulation : 33 / 60 [100.00%] @ "35495000"
+// RTL Simulation : 34 / 60 [100.00%] @ "36595000"
+// RTL Simulation : 35 / 60 [100.00%] @ "37695000"
+// RTL Simulation : 36 / 60 [100.00%] @ "38795000"
+// RTL Simulation : 37 / 60 [100.00%] @ "39895000"
+// RTL Simulation : 38 / 60 [100.00%] @ "40995000"
+// RTL Simulation : 39 / 60 [100.00%] @ "42095000"
+// RTL Simulation : 40 / 60 [100.00%] @ "43195000"
+// RTL Simulation : 41 / 60 [100.00%] @ "44295000"
+// RTL Simulation : 42 / 60 [100.00%] @ "45395000"
+// RTL Simulation : 43 / 60 [100.00%] @ "46495000"
+// RTL Simulation : 44 / 60 [100.00%] @ "47595000"
+// RTL Simulation : 45 / 60 [100.00%] @ "48695000"
+// RTL Simulation : 46 / 60 [100.00%] @ "49475000"
+// RTL Simulation : 47 / 60 [100.00%] @ "50575000"
+// RTL Simulation : 48 / 60 [100.00%] @ "51675000"
+// RTL Simulation : 49 / 60 [100.00%] @ "52775000"
+// RTL Simulation : 50 / 60 [100.00%] @ "53875000"
+// RTL Simulation : 51 / 60 [100.00%] @ "54975000"
+// RTL Simulation : 52 / 60 [100.00%] @ "56075000"
+// RTL Simulation : 53 / 60 [100.00%] @ "57175000"
+// RTL Simulation : 54 / 60 [100.00%] @ "58275000"
+// RTL Simulation : 55 / 60 [100.00%] @ "59375000"
+// RTL Simulation : 56 / 60 [100.00%] @ "60475000"
+// RTL Simulation : 57 / 60 [100.00%] @ "61575000"
+// RTL Simulation : 58 / 60 [100.00%] @ "62675000"
+// RTL Simulation : 59 / 60 [100.00%] @ "63775000"
+// RTL Simulation : 60 / 60 [100.00%] @ "64875000"
+////////////////////////////////////////////////////////////////////////////////////
+$finish called at time : 64945 ns : File "/opt/Xilinx/2025.2/Vivado/data/system_verilog/uvm_1.2/xlnx_uvm_package.sv" Line 18699
+## quit
+INFO: xsimkernel Simulation Memory Usage: 316024 KB (Peak: 364496 KB), Simulation CPU Usage: 3950 ms
+INFO: [Common 17-206] Exiting xsim at Mon Mar  2 15:43:10 2026...
+FPGA TB repo_root=/home/zzh/minkowski_fpga/hls
+FPGA TB out_base=/home/zzh/minkowski_fpga/hls/data/output/fpga/cosim
+[LAMBDA_NONE] k=0 done (m=12, predict=165.5us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] k=1 done (m=12, predict=13.0us, strip=0.6us, row_sum=0.1us)
+[LAMBDA_NONE] k=2 done (m=12, predict=10.3us, strip=0.6us, row_sum=0.1us)
+[LAMBDA_NONE] k=3 done (m=12, predict=12.2us, strip=0.6us, row_sum=0.1us)
+[LAMBDA_NONE] k=4 done (m=12, predict=10.2us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] k=5 done (m=12, predict=12.3us, strip=0.6us, row_sum=0.1us)
+[LAMBDA_NONE] k=6 done (m=12, predict=10.2us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] k=7 done (m=12, predict=9.9us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] k=8 done (m=12, predict=10.0us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] k=9 done (m=12, predict=9.8us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] k=10 done (m=12, predict=11.9us, strip=0.6us, row_sum=0.1us)
+[LAMBDA_NONE] k=11 done (m=12, predict=10.5us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] k=12 done (m=12, predict=10.0us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] k=13 done (m=12, predict=9.9us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_NONE] k=14 done (m=12, predict=11.9us, strip=0.6us, row_sum=0.1us)
+[LAMBDA_NONE] outputs: /home/zzh/minkowski_fpga/hls/data/output/fpga/cosim/LAMBDA_NONE
+[LAMBDA_NONE] kernel_time_summary_us.csv: total_predict=317.7us (n=15, avg=21.2us), total_strip=7.8us (n=30, avg=0.3us), total_row_sum=1.7us (n=15, avg=0.1us)
+[LAMBDA_SEGMENT] k=0 done (m=12, predict=12.1us, strip=0.4us, row_sum=0.1us)
+[LAMBDA_SEGMENT] k=1 done (m=12, predict=10.2us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_SEGMENT] k=2 done (m=12, predict=10.0us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_SEGMENT] k=3 done (m=12, predict=9.8us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_SEGMENT] k=4 done (m=12, predict=10.0us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_SEGMENT] k=5 done (m=12, predict=9.9us, strip=0.4us, row_sum=0.1us)
+[LAMBDA_SEGMENT] k=6 done (m=12, predict=9.9us, strip=0.4us, row_sum=0.1us)
+[LAMBDA_SEGMENT] k=7 done (m=12, predict=9.9us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_SEGMENT] k=8 done (m=12, predict=10.1us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_SEGMENT] k=9 done (m=12, predict=10.0us, strip=0.4us, row_sum=0.1us)
+[LAMBDA_SEGMENT] k=10 done (m=12, predict=12.1us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_SEGMENT] k=11 done (m=12, predict=10.3us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_SEGMENT] k=12 done (m=12, predict=9.9us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_SEGMENT] k=13 done (m=12, predict=9.7us, strip=0.4us, row_sum=0.1us)
+[LAMBDA_SEGMENT] k=14 done (m=12, predict=9.8us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_SEGMENT] outputs: /home/zzh/minkowski_fpga/hls/data/output/fpga/cosim/LAMBDA_SEGMENT
+[LAMBDA_SEGMENT] kernel_time_summary_us.csv: total_predict=153.6us (n=15, avg=10.2us), total_strip=6.9us (n=30, avg=0.2us), total_row_sum=1.9us (n=15, avg=0.1us)
+[LAMBDA_VOLUME] k=0 done (m=12, predict=17.3us, strip=0.4us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=1 done (m=12, predict=10.2us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_VOLUME] k=2 done (m=12, predict=9.9us, strip=0.4us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=3 done (m=12, predict=9.7us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=4 done (m=12, predict=9.8us, strip=0.4us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=5 done (m=12, predict=9.8us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=6 done (m=12, predict=14.3us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=7 done (m=12, predict=9.8us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=8 done (m=12, predict=9.7us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=9 done (m=12, predict=9.8us, strip=0.4us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=10 done (m=12, predict=9.9us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=11 done (m=12, predict=11.8us, strip=0.6us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=12 done (m=12, predict=10.1us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=13 done (m=12, predict=10.0us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_VOLUME] k=14 done (m=12, predict=9.8us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_VOLUME] outputs: /home/zzh/minkowski_fpga/hls/data/output/fpga/cosim/LAMBDA_VOLUME
+[LAMBDA_VOLUME] kernel_time_summary_us.csv: total_predict=162.1us (n=15, avg=10.8us), total_strip=6.9us (n=30, avg=0.2us), total_row_sum=1.6us (n=15, avg=0.1us)
+[LAMBDA_P_RADIUS] k=0 done (m=12, predict=12.5us, strip=0.4us, row_sum=0.1us)
+[LAMBDA_P_RADIUS] k=1 done (m=12, predict=13.5us, strip=1.5us, row_sum=0.5us)
+[LAMBDA_P_RADIUS] k=2 done (m=12, predict=31.4us, strip=1.6us, row_sum=0.8us)
+[LAMBDA_P_RADIUS] k=3 done (m=12, predict=25.1us, strip=1.2us, row_sum=0.6us)
+[LAMBDA_P_RADIUS] k=4 done (m=12, predict=12.5us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_P_RADIUS] k=5 done (m=12, predict=10.1us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_P_RADIUS] k=6 done (m=12, predict=10.3us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_P_RADIUS] k=7 done (m=12, predict=10.0us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_P_RADIUS] k=8 done (m=12, predict=10.2us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_P_RADIUS] k=9 done (m=12, predict=9.7us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_P_RADIUS] k=10 done (m=12, predict=10.2us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_P_RADIUS] k=11 done (m=12, predict=9.7us, strip=0.5us, row_sum=0.1us)
+[LAMBDA_P_RADIUS] k=12 done (m=12, predict=9.7us, strip=0.5us, row_sum=0.2us)
+[LAMBDA_P_RADIUS] k=13 done (m=12, predict=12.4us, strip=0.6us, row_sum=0.2us)
+[LAMBDA_P_RADIUS] k=14 done (m=12, predict=10.1us, strip=0.5us, row_sum=0.3us)
+[LAMBDA_P_RADIUS] outputs: /home/zzh/minkowski_fpga/hls/data/output/fpga/cosim/LAMBDA_P_RADIUS
+[LAMBDA_P_RADIUS] kernel_time_summary_us.csv: total_predict=197.2us (n=15, avg=13.1us), total_strip=9.9us (n=30, avg=0.3us), total_row_sum=4.2us (n=15, avg=0.3us)
+All done. Results under: /home/zzh/minkowski_fpga/hls/data/output/fpga/cosim

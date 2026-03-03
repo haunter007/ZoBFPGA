@@ -1,0 +1,80 @@
+<xilinx:hls_fe_msgs>
+    <msg msg_groups="PRAGMA_VERBOSE_DUMP" msg_id="207-6999" msg_severity="WARNING" msg_loc="/home/zzh/minkowski_fpga/hls/run_hls.tcl:137:1" msg_body="HLS pragma dump">
+        <args ARG_PragmaContext="directive" ARG_PragmaFunction="predict_kernel" ARG_PragmaIsValid="1" ARG_PragmaOptions="name=predict_kernel" ARG_PragmaType="top" ClangWarningOption="dump-hls-pragmas"/>
+    </msg>
+    <msg msg_groups="PRAGMA_VERBOSE_DUMP" msg_id="207-6999" msg_severity="WARNING" msg_loc="src/fpga_kernels.cpp:24:1" msg_body="HLS pragma dump">
+        <args ARG_PragmaContext="hls" ARG_PragmaFunction="predict_kernel" ARG_PragmaIsValid="1" ARG_PragmaOptions="variable=A complete dim=2" ARG_PragmaType="array_partition" ClangWarningOption="dump-hls-pragmas"/>
+    </msg>
+    <msg msg_groups="PRAGMA_VERBOSE_DUMP" msg_id="207-6999" msg_severity="WARNING" msg_loc="src/fpga_kernels.cpp:25:1" msg_body="HLS pragma dump">
+        <args ARG_PragmaContext="hls" ARG_PragmaFunction="predict_kernel" ARG_PragmaIsValid="1" ARG_PragmaOptions="variable=p_x complete dim=1" ARG_PragmaType="array_partition" ClangWarningOption="dump-hls-pragmas"/>
+    </msg>
+    <msg msg_groups="PRAGMA_VERBOSE_DUMP" msg_id="207-6999" msg_severity="WARNING" msg_loc="src/fpga_kernels.cpp:26:1" msg_body="HLS pragma dump">
+        <args ARG_PragmaContext="hls" ARG_PragmaFunction="predict_kernel" ARG_PragmaIsValid="1" ARG_PragmaOptions="variable=p_w complete dim=1" ARG_PragmaType="array_partition" ClangWarningOption="dump-hls-pragmas"/>
+    </msg>
+    <msg msg_groups="PRAGMA_VERBOSE_DUMP" msg_id="207-6999" msg_severity="WARNING" msg_loc="src/fpga_kernels.cpp:27:1" msg_body="HLS pragma dump">
+        <args ARG_PragmaContext="hls" ARG_PragmaFunction="predict_kernel" ARG_PragmaIsValid="1" ARG_PragmaOptions="variable=p_pred complete dim=1" ARG_PragmaType="array_partition" ClangWarningOption="dump-hls-pragmas"/>
+    </msg>
+    <msg msg_groups="PRAGMA_VERBOSE_DUMP" msg_id="207-6999" msg_severity="WARNING" msg_loc="src/fpga_kernels.cpp:29:1" msg_body="HLS pragma dump">
+        <args ARG_PragmaContext="hls" ARG_PragmaFunction="predict_kernel" ARG_PragmaIsValid="1" ARG_PragmaOptions="variable=H_x complete dim=1" ARG_PragmaType="array_partition" ClangWarningOption="dump-hls-pragmas"/>
+    </msg>
+    <msg msg_groups="PRAGMA_VERBOSE_DUMP" msg_id="207-6999" msg_severity="WARNING" msg_loc="src/fpga_kernels.cpp:30:1" msg_body="HLS pragma dump">
+        <args ARG_PragmaContext="hls" ARG_PragmaFunction="predict_kernel" ARG_PragmaIsValid="1" ARG_PragmaOptions="variable=H_w complete dim=1" ARG_PragmaType="array_partition" ClangWarningOption="dump-hls-pragmas"/>
+    </msg>
+    <msg msg_groups="PRAGMA_VERBOSE_DUMP" msg_id="207-6999" msg_severity="WARNING" msg_loc="src/fpga_kernels.cpp:31:1" msg_body="HLS pragma dump">
+        <args ARG_PragmaContext="hls" ARG_PragmaFunction="predict_kernel" ARG_PragmaIsValid="1" ARG_PragmaOptions="variable=H_pred complete dim=1" ARG_PragmaType="array_partition" ClangWarningOption="dump-hls-pragmas"/>
+    </msg>
+    <msg msg_groups="PRAGMA_VERBOSE_DUMP" msg_id="207-6999" msg_severity="WARNING" msg_loc="src/fpga_kernels.cpp:36:1" msg_body="HLS pragma dump">
+        <args ARG_PragmaContext="hls" ARG_PragmaFunction="predict_kernel" ARG_PragmaIsValid="1" ARG_PragmaOptions="II=1" ARG_PragmaType="pipeline" ClangWarningOption="dump-hls-pragmas"/>
+    </msg>
+    <msg msg_groups="PRAGMA_VERBOSE_DUMP" msg_id="207-6999" msg_severity="WARNING" msg_loc="src/fpga_kernels.cpp:39:1" msg_body="HLS pragma dump">
+        <args ARG_PragmaContext="hls" ARG_PragmaFunction="predict_kernel" ARG_PragmaIsValid="1" ARG_PragmaType="unroll" ClangWarningOption="dump-hls-pragmas"/>
+    </msg>
+    <msg msg_groups="PRAGMA_VERBOSE_DUMP" msg_id="207-6999" msg_severity="WARNING" msg_loc="src/fpga_kernels.cpp:47:1" msg_body="HLS pragma dump">
+        <args ARG_PragmaContext="hls" ARG_PragmaFunction="predict_kernel" ARG_PragmaIsValid="1" ARG_PragmaOptions="min=0 max=32" ARG_PragmaType="loop_tripcount" ClangWarningOption="dump-hls-pragmas"/>
+    </msg>
+    <msg msg_groups="PRAGMA_VERBOSE_DUMP" msg_id="207-6999" msg_severity="WARNING" msg_loc="src/fpga_kernels.cpp:49:1" msg_body="HLS pragma dump">
+        <args ARG_PragmaContext="hls" ARG_PragmaFunction="predict_kernel" ARG_PragmaIsValid="1" ARG_PragmaOptions="II=1" ARG_PragmaType="pipeline" ClangWarningOption="dump-hls-pragmas"/>
+    </msg>
+    <msg msg_groups="PRAGMA_VERBOSE_DUMP" msg_id="207-6999" msg_severity="WARNING" msg_loc="src/fpga_kernels.cpp:52:1" msg_body="HLS pragma dump">
+        <args ARG_PragmaContext="hls" ARG_PragmaFunction="predict_kernel" ARG_PragmaIsValid="1" ARG_PragmaType="unroll" ClangWarningOption="dump-hls-pragmas"/>
+    </msg>
+    <msg msg_groups="PRAGMA_VERBOSE_DUMP" msg_id="207-6999" msg_severity="WARNING" msg_loc="src/fpga_kernels.cpp:60:1" msg_body="HLS pragma dump">
+        <args ARG_PragmaContext="hls" ARG_PragmaFunction="predict_kernel" ARG_PragmaIsValid="1" ARG_PragmaOptions="min=0 max=32" ARG_PragmaType="loop_tripcount" ClangWarningOption="dump-hls-pragmas"/>
+    </msg>
+    <msg msg_groups="PRAGMA_VERBOSE_DUMP" msg_id="207-6999" msg_severity="WARNING" msg_loc="src/fpga_kernels.cpp:62:1" msg_body="HLS pragma dump">
+        <args ARG_PragmaContext="hls" ARG_PragmaFunction="predict_kernel" ARG_PragmaIsValid="1" ARG_PragmaOptions="II=1" ARG_PragmaType="pipeline" ClangWarningOption="dump-hls-pragmas"/>
+    </msg>
+    <msg msg_groups="PRAGMA_UNROLL" msg_id="214-291" msg_severity="INFO" msg_loc="src/fpga_kernels.cpp:51:30" msg_body="Loop 'VITIS_LOOP_51_5' is marked as complete unroll implied by the pipeline pragma">
+        <args LoopName="VITIS_LOOP_51_5"/>
+    </msg>
+    <msg msg_groups="PRAGMA_UNROLL" msg_id="214-291" msg_severity="INFO" msg_loc="src/fpga_kernels.cpp:38:26" msg_body="Loop 'VITIS_LOOP_38_2' is marked as complete unroll implied by the pipeline pragma">
+        <args LoopName="VITIS_LOOP_38_2"/>
+    </msg>
+    <msg msg_groups="PRAGMA_UNROLL" msg_id="214-186" msg_severity="INFO" msg_loc="src/fpga_kernels.cpp:17:0" msg_body="Unrolling loop 'VITIS_LOOP_51_5' (src/fpga_kernels.cpp:51:30) in function 'predict_kernel' completely with a factor of 4">
+        <args Factor="4" LoopLoc="src/fpga_kernels.cpp:51:30" LoopName="VITIS_LOOP_51_5"/>
+    </msg>
+    <msg msg_groups="PRAGMA_UNROLL" msg_id="214-186" msg_severity="INFO" msg_loc="src/fpga_kernels.cpp:17:0" msg_body="Unrolling loop 'VITIS_LOOP_38_2' (src/fpga_kernels.cpp:38:26) in function 'predict_kernel' completely with a factor of 4">
+        <args Factor="4" LoopLoc="src/fpga_kernels.cpp:38:26" LoopName="VITIS_LOOP_38_2"/>
+    </msg>
+    <msg msg_groups="PRAGMA_MISC" msg_id="214-248" msg_severity="INFO" msg_loc="src/fpga_kernels.cpp:17:0" msg_body="Applying array_partition to 'p_x': Complete partitioning on dimension 1.">
+        <args Dim="1" Mode="Complete" UOName="p_x"/>
+    </msg>
+    <msg msg_groups="PRAGMA_MISC" msg_id="214-248" msg_severity="INFO" msg_loc="src/fpga_kernels.cpp:17:0" msg_body="Applying array_partition to 'H_x': Complete partitioning on dimension 1.">
+        <args Dim="1" Mode="Complete" UOName="H_x"/>
+    </msg>
+    <msg msg_groups="PRAGMA_MISC" msg_id="214-248" msg_severity="INFO" msg_loc="src/fpga_kernels.cpp:17:0" msg_body="Applying array_partition to 'A': Complete partitioning on dimension 2.">
+        <args Dim="2" Mode="Complete" UOName="A"/>
+    </msg>
+    <msg msg_groups="PRAGMA_MISC" msg_id="214-248" msg_severity="INFO" msg_loc="src/fpga_kernels.cpp:17:0" msg_body="Applying array_partition to 'p_w': Complete partitioning on dimension 1.">
+        <args Dim="1" Mode="Complete" UOName="p_w"/>
+    </msg>
+    <msg msg_groups="PRAGMA_MISC" msg_id="214-248" msg_severity="INFO" msg_loc="src/fpga_kernels.cpp:17:0" msg_body="Applying array_partition to 'H_w': Complete partitioning on dimension 1.">
+        <args Dim="1" Mode="Complete" UOName="H_w"/>
+    </msg>
+    <msg msg_groups="PRAGMA_MISC" msg_id="214-248" msg_severity="INFO" msg_loc="src/fpga_kernels.cpp:17:0" msg_body="Applying array_partition to 'p_pred': Complete partitioning on dimension 1.">
+        <args Dim="1" Mode="Complete" UOName="p_pred"/>
+    </msg>
+    <msg msg_groups="PRAGMA_MISC" msg_id="214-248" msg_severity="INFO" msg_loc="src/fpga_kernels.cpp:17:0" msg_body="Applying array_partition to 'H_pred': Complete partitioning on dimension 1.">
+        <args Dim="1" Mode="Complete" UOName="H_pred"/>
+    </msg>
+</xilinx:hls_fe_msgs>
