@@ -247,6 +247,8 @@ static void run_one_method(LambdaMethod method, const char* method_name, const s
         const data_t C[N_MEAS][N_STATE] = {
             {1, 0, 0, 0},
             {0, 1, 0, 0},
+            {0, 0, 1, 0},
+            {0, 0, 0, 1},
         };
 
         // TRUE SYSTEM: x_{k+1} = A x_k + w

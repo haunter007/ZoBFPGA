@@ -30,7 +30,7 @@ N_STATE = 4          # n
 N_INPUT = 1          # n_u 
 
 # Number of scalar measurements 测量维度
-N_MEAS = 2           # n_y  (must satisfy N_MEAS <= N_STATE in this toy example) 
+N_MEAS = 4     # n_y
 
 # Number of simulation steps 仿真步数
 NUM_STEPS = 15
@@ -47,7 +47,7 @@ MEAS_NOISE_RADIUS = 0.1  # 0.1
 # Initial state box radius (per coordinate)
 INIT_RADIUS = 0.2  # 0.2
 
-# Zonotope reduction budget (max # of generators kept before row-sum aggregation) 降阶保留的生成器数量
+# Zonotope reduction budget (max # of generators kept before row-sum aggregation) 
 REDUCTION_BUDGET = 8
 
 # Random seed for reproducibility 随机种子用于可重复性？
@@ -55,7 +55,7 @@ RANDOM_SEED = 42
 
 # Output partition for Python-vs-HLS comparison results
 OUTPUT_PARTITION = "python_hls_compare"
-HLS_REF_MODE = "csim"
+HLS_REF_MODE = "cosim"             # csim/cosim/ (prefer cosim if available)
 HLS_REF_METHOD = "LAMBDA_VOLUME"  # LAMBDA_P_RADIUS/LAMBDA_SEGMENT/LAMBDA_VOLUME/NONE
 ESTIMATION_METHOD = "volume"      # 'None', 'segment', 'p_radius', 'volume'
 

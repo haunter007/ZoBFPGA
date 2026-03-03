@@ -4,7 +4,7 @@
 #define N_STATE               4     // 状态维度
 #define MAX_GEN               32    // 最大生成器数量
 #define N_INPUT               1     // 输入维度
-#define N_MEAS                2     // 测量维度
+#define N_MEAS                4     // 测量维度
 #define NUM_STEPS             15    // 仿真步数
 #define DT                    0.1   // 采样时间
 #define PROC_NOISE_RADIUS     0.05  // 过程噪声半径

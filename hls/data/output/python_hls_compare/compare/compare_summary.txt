@@ -1,4 +1,4 @@
-HLS reference directory: /home/zzh/minkowski_fpga/hls/data/output/fpga/csim/LAMBDA_VOLUME
-Python avg step time (us): 715.615500
-HLS avg kernel step time (us): 0.979071
-Average speedup (x): 741.550347
+HLS reference directory: /home/zzh/minkowski_fpga/hls/data/output/fpga/cosim/LAMBDA_VOLUME
+Python avg step time (us): 1166.465856
+HLS avg kernel step time (us): 11.429214
+Average speedup (x): 104.759299

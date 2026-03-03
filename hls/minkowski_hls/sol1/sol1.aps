@@ -19,10 +19,4 @@
         <config_interface m_axi_addr64="1"/>
         <config_compile complex-mul-dsp="0" pipeline_loops="1"/>
     </config>
-    <Simulation argv="">
-        <SimFlow name="cosim" setup="false" dumpTrace="none" optimizeCompile="false" ldflags="" mflags="" compiledLibrary="" toolName="xsim">
-            <Rtl name="verilog" active="true"/>
-            <Rtl name="vhdl" active="false"/>
-        </SimFlow>
-    </Simulation>
 </AutoPilot:solution>

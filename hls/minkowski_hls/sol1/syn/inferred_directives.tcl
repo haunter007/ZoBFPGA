@@ -1,3 +1,0 @@
-# Inferred from performance & pipeline pragmas/directives
-set_directive_loop_flatten predict_kernel/VITIS_LOOP_45_3
-set_directive_loop_flatten predict_kernel/VITIS_LOOP_59_6
