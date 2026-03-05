@@ -1,0 +1,1 @@
+set ::AESL_AUTOSIM::gTopFileName /home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/./sim/autowrap/testbench/fpga_kernels.cpp_pre.cpp.tb.cpp

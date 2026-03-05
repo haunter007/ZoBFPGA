@@ -1,0 +1,196 @@
+---
+MainSourceFile:  '/home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/fpga_kernels.pp.0.cpp'
+Diagnostics:
+  - DiagnosticName:  xilinx-label-all-loops
+    DiagnosticMessage:
+      Message:         'Added loop label VITIS_LOOP_35_1:  '
+      FilePath:        '/home/zzh/minkowski_fpga/src/hls/fpga_kernels.cpp'
+      FileOffset:      35
+      Replacements:
+        - FilePath:        '/home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/fpga_kernels.pp.0.cpp'
+          Offset:          576599
+          Length:          0
+          ReplacementText: 'VITIS_LOOP_35_1: '
+    Level:           Remark
+    BuildDirectory:  '/home/zzh/minkowski_fpga/src/hls'
+  - DiagnosticName:  xilinx-label-all-loops
+    DiagnosticMessage:
+      Message:         'Added loop label VITIS_LOOP_38_2:  '
+      FilePath:        '/home/zzh/minkowski_fpga/src/hls/fpga_kernels.cpp'
+      FileOffset:      38
+      Replacements:
+        - FilePath:        '/home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/fpga_kernels.pp.0.cpp'
+          Offset:          576687
+          Length:          0
+          ReplacementText: 'VITIS_LOOP_38_2: '
+    Level:           Remark
+    BuildDirectory:  '/home/zzh/minkowski_fpga/src/hls'
+  - DiagnosticName:  xilinx-label-all-loops
+    DiagnosticMessage:
+      Message:         'Added loop label VITIS_LOOP_45_3:  '
+      FilePath:        '/home/zzh/minkowski_fpga/src/hls/fpga_kernels.cpp'
+      FileOffset:      45
+      Replacements:
+        - FilePath:        '/home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/fpga_kernels.pp.0.cpp'
+          Offset:          576797
+          Length:          0
+          ReplacementText: 'VITIS_LOOP_45_3: '
+    Level:           Remark
+    BuildDirectory:  '/home/zzh/minkowski_fpga/src/hls'
+  - DiagnosticName:  xilinx-label-all-loops
+    DiagnosticMessage:
+      Message:         'Added loop label VITIS_LOOP_48_4:  '
+      FilePath:        '/home/zzh/minkowski_fpga/src/hls/fpga_kernels.cpp'
+      FileOffset:      48
+      Replacements:
+        - FilePath:        '/home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/fpga_kernels.pp.0.cpp'
+          Offset:          576874
+          Length:          0
+          ReplacementText: 'VITIS_LOOP_48_4: '
+    Level:           Remark
+    BuildDirectory:  '/home/zzh/minkowski_fpga/src/hls'
+  - DiagnosticName:  xilinx-label-all-loops
+    DiagnosticMessage:
+      Message:         'Added loop label VITIS_LOOP_51_5:  '
+      FilePath:        '/home/zzh/minkowski_fpga/src/hls/fpga_kernels.cpp'
+      FileOffset:      51
+      Replacements:
+        - FilePath:        '/home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/fpga_kernels.pp.0.cpp'
+          Offset:          576970
+          Length:          0
+          ReplacementText: 'VITIS_LOOP_51_5: '
+    Level:           Remark
+    BuildDirectory:  '/home/zzh/minkowski_fpga/src/hls'
+  - DiagnosticName:  xilinx-label-all-loops
+    DiagnosticMessage:
+      Message:         'Added loop label VITIS_LOOP_59_6:  '
+      FilePath:        '/home/zzh/minkowski_fpga/src/hls/fpga_kernels.cpp'
+      FileOffset:      59
+      Replacements:
+        - FilePath:        '/home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/fpga_kernels.pp.0.cpp'
+          Offset:          577104
+          Length:          0
+          ReplacementText: 'VITIS_LOOP_59_6: '
+    Level:           Remark
+    BuildDirectory:  '/home/zzh/minkowski_fpga/src/hls'
+  - DiagnosticName:  xilinx-label-all-loops
+    DiagnosticMessage:
+      Message:         'Added loop label VITIS_LOOP_61_7:  '
+      FilePath:        '/home/zzh/minkowski_fpga/src/hls/fpga_kernels.cpp'
+      FileOffset:      61
+      Replacements:
+        - FilePath:        '/home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/fpga_kernels.pp.0.cpp'
+          Offset:          577180
+          Length:          0
+          ReplacementText: 'VITIS_LOOP_61_7: '
+    Level:           Remark
+    BuildDirectory:  '/home/zzh/minkowski_fpga/src/hls'
+  - DiagnosticName:  xilinx-label-all-loops
+    DiagnosticMessage:
+      Message:         'Added loop label VITIS_LOOP_86_1:  '
+      FilePath:        '/home/zzh/minkowski_fpga/src/hls/fpga_kernels.cpp'
+      FileOffset:      86
+      Replacements:
+        - FilePath:        '/home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/fpga_kernels.pp.0.cpp'
+          Offset:          577595
+          Length:          0
+          ReplacementText: 'VITIS_LOOP_86_1: '
+    Level:           Remark
+    BuildDirectory:  '/home/zzh/minkowski_fpga/src/hls'
+  - DiagnosticName:  xilinx-label-all-loops
+    DiagnosticMessage:
+      Message:         'Added loop label VITIS_LOOP_92_2:  '
+      FilePath:        '/home/zzh/minkowski_fpga/src/hls/fpga_kernels.cpp'
+      FileOffset:      92
+      Replacements:
+        - FilePath:        '/home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/fpga_kernels.pp.0.cpp'
+          Offset:          577695
+          Length:          0
+          ReplacementText: 'VITIS_LOOP_92_2: '
+    Level:           Remark
+    BuildDirectory:  '/home/zzh/minkowski_fpga/src/hls'
+  - DiagnosticName:  xilinx-label-all-loops
+    DiagnosticMessage:
+      Message:         'Added loop label VITIS_LOOP_97_3:  '
+      FilePath:        '/home/zzh/minkowski_fpga/src/hls/fpga_kernels.cpp'
+      FileOffset:      97
+      Replacements:
+        - FilePath:        '/home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/fpga_kernels.pp.0.cpp'
+          Offset:          577774
+          Length:          0
+          ReplacementText: 'VITIS_LOOP_97_3: '
+    Level:           Remark
+    BuildDirectory:  '/home/zzh/minkowski_fpga/src/hls'
+  - DiagnosticName:  xilinx-label-all-loops
+    DiagnosticMessage:
+      Message:         'Added loop label VITIS_LOOP_99_4:  '
+      FilePath:        '/home/zzh/minkowski_fpga/src/hls/fpga_kernels.cpp'
+      FileOffset:      99
+      Replacements:
+        - FilePath:        '/home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/fpga_kernels.pp.0.cpp'
+          Offset:          577832
+          Length:          0
+          ReplacementText: 'VITIS_LOOP_99_4: '
+    Level:           Remark
+    BuildDirectory:  '/home/zzh/minkowski_fpga/src/hls'
+  - DiagnosticName:  xilinx-label-all-loops
+    DiagnosticMessage:
+      Message:         'Added loop label VITIS_LOOP_102_5:  '
+      FilePath:        '/home/zzh/minkowski_fpga/src/hls/fpga_kernels.cpp'
+      FileOffset:      102
+      Replacements:
+        - FilePath:        '/home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/fpga_kernels.pp.0.cpp'
+          Offset:          577909
+          Length:          0
+          ReplacementText: 'VITIS_LOOP_102_5: '
+    Level:           Remark
+    BuildDirectory:  '/home/zzh/minkowski_fpga/src/hls'
+  - DiagnosticName:  xilinx-label-all-loops
+    DiagnosticMessage:
+      Message:         'Added loop label VITIS_LOOP_108_6:  '
+      FilePath:        '/home/zzh/minkowski_fpga/src/hls/fpga_kernels.cpp'
+      FileOffset:      108
+      Replacements:
+        - FilePath:        '/home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/fpga_kernels.pp.0.cpp'
+          Offset:          578008
+          Length:          0
+          ReplacementText: 'VITIS_LOOP_108_6: '
+    Level:           Remark
+    BuildDirectory:  '/home/zzh/minkowski_fpga/src/hls'
+  - DiagnosticName:  xilinx-label-all-loops
+    DiagnosticMessage:
+      Message:         'Added loop label VITIS_LOOP_122_1:  '
+      FilePath:        '/home/zzh/minkowski_fpga/src/hls/fpga_kernels.cpp'
+      FileOffset:      122
+      Replacements:
+        - FilePath:        '/home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/fpga_kernels.pp.0.cpp'
+          Offset:          578208
+          Length:          0
+          ReplacementText: 'VITIS_LOOP_122_1: '
+    Level:           Remark
+    BuildDirectory:  '/home/zzh/minkowski_fpga/src/hls'
+  - DiagnosticName:  xilinx-label-all-loops
+    DiagnosticMessage:
+      Message:         'Added loop label VITIS_LOOP_124_2:  '
+      FilePath:        '/home/zzh/minkowski_fpga/src/hls/fpga_kernels.cpp'
+      FileOffset:      124
+      Replacements:
+        - FilePath:        '/home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/fpga_kernels.pp.0.cpp'
+          Offset:          578259
+          Length:          0
+          ReplacementText: 'VITIS_LOOP_124_2: '
+    Level:           Remark
+    BuildDirectory:  '/home/zzh/minkowski_fpga/src/hls'
+  - DiagnosticName:  xilinx-label-all-loops
+    DiagnosticMessage:
+      Message:         'Added loop label VITIS_LOOP_125_3:  '
+      FilePath:        '/home/zzh/minkowski_fpga/src/hls/fpga_kernels.cpp'
+      FileOffset:      125
+      Replacements:
+        - FilePath:        '/home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/fpga_kernels.pp.0.cpp'
+          Offset:          578302
+          Length:          0
+          ReplacementText: 'VITIS_LOOP_125_3: '
+    Level:           Remark
+    BuildDirectory:  '/home/zzh/minkowski_fpga/src/hls'
+...

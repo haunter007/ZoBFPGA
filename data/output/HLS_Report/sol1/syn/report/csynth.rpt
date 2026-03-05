@@ -1,0 +1,262 @@
+
+
+================================================================
+== Synthesis Summary Report of 'predict_kernel'
+================================================================
++ General Information: 
+    * Date:           Thu Mar  5 10:37:44 2026
+    * Version:        2025.2 (Build 6295257 on Nov 14 2025)
+    * Project:        HLS_Report
+    * Solution:       sol1 (Vivado IP Flow Target)
+    * Product family: zynquplus
+    * Target device:  xck26-sfvc784-2LV-c
+    
+
+* Performance & Resource Estimates: 
++------------------------------------------------------------+------+---------------+----------+---------+------+----------+---------+-----------+------+------+---------+-----------+-----------+-----+
+|                           Modules                          | Issue|               | Iteration|         | Trip |          |       Latency       |      |      |         |           |           |     |
+|                           & Loops                          | Type | Violation Type|  Latency | Interval| Count| Pipelined| (cycles)|    (ns)   | Slack| BRAM |   DSP   |     FF    |    LUT    | URAM|
++------------------------------------------------------------+------+---------------+----------+---------+------+----------+---------+-----------+------+------+---------+-----------+-----------+-----+
+|+ predict_kernel                                            |     -|              -|         -|      308|     -|        no|      307|  3.070e+03|  0.28|     -|  20 (1%)|  3021 (1%)|  2850 (2%)|    -|
+| + predict_kernel_Pipeline_VITIS_LOOP_35_1                  |     -|              -|         -|        -|     -|       yes|       24|    240.000|  0.28|     -|        -|  399 (~0%)|  144 (~0%)|    -|
+|  o VITIS_LOOP_35_1                                         |     -|              -|        20|        1|     4|       yes|       22|    220.000|  7.30|     -|        -|          -|          -|    -|
+| + predict_kernel_Pipeline_VITIS_LOOP_45_3_VITIS_LOOP_48_4  |     -|              -|         -|        -|     -|       yes|      148|  1.480e+03|  0.28|     -|        -|  759 (~0%)|  372 (~0%)|    -|
+|  o VITIS_LOOP_45_3_VITIS_LOOP_48_4                         |     -|              -|        20|        1|   128|       yes|      146|  1.460e+03|  7.30|     -|        -|          -|          -|    -|
+| + predict_kernel_Pipeline_VITIS_LOOP_59_6_VITIS_LOOP_61_7  |     -|              -|         -|        -|     -|       yes|      130|  1.300e+03|  4.89|     -|        -|   27 (~0%)|  180 (~0%)|    -|
+|  o VITIS_LOOP_59_6_VITIS_LOOP_61_7                         |     -|              -|         2|        1|   128|       yes|      128|  1.280e+03|  7.30|     -|        -|          -|          -|    -|
++------------------------------------------------------------+------+---------------+----------+---------+------+----------+---------+-----------+------+------+---------+-----------+-----------+-----+
+    Name Prefix: '+' for module, 'o' for loop, '*' for dataflow
+
+
+================================================================
+== HW Interfaces
+================================================================
+* AP_MEMORY
++-------------------+-----------+----------+
+| Port              | Direction | Bitwidth |
++-------------------+-----------+----------+
+| A_0_address0      | out       | 2        |
+| A_0_q0            | in        | 32       |
+| A_1_address0      | out       | 2        |
+| A_1_q0            | in        | 32       |
+| A_2_address0      | out       | 2        |
+| A_2_q0            | in        | 32       |
+| A_3_address0      | out       | 2        |
+| A_3_q0            | in        | 32       |
+| H_pred_0_address0 | out       | 5        |
+| H_pred_0_d0       | out       | 32       |
+| H_pred_1_address0 | out       | 5        |
+| H_pred_1_d0       | out       | 32       |
+| H_pred_2_address0 | out       | 5        |
+| H_pred_2_d0       | out       | 32       |
+| H_pred_3_address0 | out       | 5        |
+| H_pred_3_d0       | out       | 32       |
+| H_w_0_address0    | out       | 5        |
+| H_w_0_q0          | in        | 32       |
+| H_w_1_address0    | out       | 5        |
+| H_w_1_q0          | in        | 32       |
+| H_w_2_address0    | out       | 5        |
+| H_w_2_q0          | in        | 32       |
+| H_w_3_address0    | out       | 5        |
+| H_w_3_q0          | in        | 32       |
+| H_x_0_address0    | out       | 5        |
+| H_x_0_q0          | in        | 32       |
+| H_x_1_address0    | out       | 5        |
+| H_x_1_q0          | in        | 32       |
+| H_x_2_address0    | out       | 5        |
+| H_x_2_q0          | in        | 32       |
+| H_x_3_address0    | out       | 5        |
+| H_x_3_q0          | in        | 32       |
++-------------------+-----------+----------+
+
+* Other Ports
++----------+---------+-----------+----------+
+| Port     | Mode    | Direction | Bitwidth |
++----------+---------+-----------+----------+
+| m_pred   | ap_vld  | out       | 32       |
+| m_w      | ap_none | in        | 32       |
+| m_x      | ap_none | in        | 32       |
+| p_pred_0 | ap_vld  | out       | 32       |
+| p_pred_1 | ap_vld  | out       | 32       |
+| p_pred_2 | ap_vld  | out       | 32       |
+| p_pred_3 | ap_vld  | out       | 32       |
+| p_w_0    | ap_none | in        | 32       |
+| p_w_1    | ap_none | in        | 32       |
+| p_w_2    | ap_none | in        | 32       |
+| p_w_3    | ap_none | in        | 32       |
+| p_x_0    | ap_none | in        | 32       |
+| p_x_1    | ap_none | in        | 32       |
+| p_x_2    | ap_none | in        | 32       |
+| p_x_3    | ap_none | in        | 32       |
++----------+---------+-----------+----------+
+
+* TOP LEVEL CONTROL
++-----------+------------+-----------------------------------+
+| Interface | Type       | Ports                             |
++-----------+------------+-----------------------------------+
+| ap_clk    | clock      | ap_clk                            |
+| ap_rst    | reset      | ap_rst                            |
+| ap_ctrl   | ap_ctrl_hs | ap_done ap_idle ap_ready ap_start |
++-----------+------------+-----------------------------------+
+
+
+================================================================
+== SW I/O Information
+================================================================
+* Top Function Arguments
++----------+-----------+---------------+
+| Argument | Direction | Datatype      |
++----------+-----------+---------------+
+| p_x      | in        | float const * |
+| H_x      | in        | float const * |
+| m_x      | in        | int           |
+| A        | in        | float const * |
+| p_w      | in        | float const * |
+| H_w      | in        | float const * |
+| m_w      | in        | int           |
+| p_pred   | out       | float*        |
+| H_pred   | out       | float*        |
+| m_pred   | out       | int*          |
++----------+-----------+---------------+
+
+* SW-to-HW Mapping
++----------+-------------------+---------+----------+
+| Argument | HW Interface      | HW Type | HW Usage |
++----------+-------------------+---------+----------+
+| p_x      | p_x_0             | port    |          |
+| p_x      | p_x_1             | port    |          |
+| p_x      | p_x_2             | port    |          |
+| p_x      | p_x_3             | port    |          |
+| H_x      | H_x_0_address0    | port    | offset   |
+| H_x      | H_x_0_ce0         | port    |          |
+| H_x      | H_x_0_q0          | port    |          |
+| H_x      | H_x_1_address0    | port    | offset   |
+| H_x      | H_x_1_ce0         | port    |          |
+| H_x      | H_x_1_q0          | port    |          |
+| H_x      | H_x_2_address0    | port    | offset   |
+| H_x      | H_x_2_ce0         | port    |          |
+| H_x      | H_x_2_q0          | port    |          |
+| H_x      | H_x_3_address0    | port    | offset   |
+| H_x      | H_x_3_ce0         | port    |          |
+| H_x      | H_x_3_q0          | port    |          |
+| m_x      | m_x               | port    |          |
+| A        | A_0_address0      | port    | offset   |
+| A        | A_0_ce0           | port    |          |
+| A        | A_0_q0            | port    |          |
+| A        | A_1_address0      | port    | offset   |
+| A        | A_1_ce0           | port    |          |
+| A        | A_1_q0            | port    |          |
+| A        | A_2_address0      | port    | offset   |
+| A        | A_2_ce0           | port    |          |
+| A        | A_2_q0            | port    |          |
+| A        | A_3_address0      | port    | offset   |
+| A        | A_3_ce0           | port    |          |
+| A        | A_3_q0            | port    |          |
+| p_w      | p_w_0             | port    |          |
+| p_w      | p_w_1             | port    |          |
+| p_w      | p_w_2             | port    |          |
+| p_w      | p_w_3             | port    |          |
+| H_w      | H_w_0_address0    | port    | offset   |
+| H_w      | H_w_0_ce0         | port    |          |
+| H_w      | H_w_0_q0          | port    |          |
+| H_w      | H_w_1_address0    | port    | offset   |
+| H_w      | H_w_1_ce0         | port    |          |
+| H_w      | H_w_1_q0          | port    |          |
+| H_w      | H_w_2_address0    | port    | offset   |
+| H_w      | H_w_2_ce0         | port    |          |
+| H_w      | H_w_2_q0          | port    |          |
+| H_w      | H_w_3_address0    | port    | offset   |
+| H_w      | H_w_3_ce0         | port    |          |
+| H_w      | H_w_3_q0          | port    |          |
+| m_w      | m_w               | port    |          |
+| p_pred   | p_pred_0          | port    |          |
+| p_pred   | p_pred_0_ap_vld   | port    |          |
+| p_pred   | p_pred_1          | port    |          |
+| p_pred   | p_pred_1_ap_vld   | port    |          |
+| p_pred   | p_pred_2          | port    |          |
+| p_pred   | p_pred_2_ap_vld   | port    |          |
+| p_pred   | p_pred_3          | port    |          |
+| p_pred   | p_pred_3_ap_vld   | port    |          |
+| H_pred   | H_pred_0_address0 | port    | offset   |
+| H_pred   | H_pred_0_ce0      | port    |          |
+| H_pred   | H_pred_0_we0      | port    |          |
+| H_pred   | H_pred_0_d0       | port    |          |
+| H_pred   | H_pred_1_address0 | port    | offset   |
+| H_pred   | H_pred_1_ce0      | port    |          |
+| H_pred   | H_pred_1_we0      | port    |          |
+| H_pred   | H_pred_1_d0       | port    |          |
+| H_pred   | H_pred_2_address0 | port    | offset   |
+| H_pred   | H_pred_2_ce0      | port    |          |
+| H_pred   | H_pred_2_we0      | port    |          |
+| H_pred   | H_pred_2_d0       | port    |          |
+| H_pred   | H_pred_3_address0 | port    | offset   |
+| H_pred   | H_pred_3_ce0      | port    |          |
+| H_pred   | H_pred_3_we0      | port    |          |
+| H_pred   | H_pred_3_d0       | port    |          |
+| m_pred   | m_pred            | port    |          |
+| m_pred   | m_pred_ap_vld     | port    |          |
++----------+-------------------+---------+----------+
+
+
+================================================================
+== Bind Op Report
+================================================================
++------------------------------------------------------------+-----+--------+-------------+-----------+--------------------------+---------+
+| Name                                                       | DSP | Pragma | Variable    | Op        | Impl                     | Latency |
++------------------------------------------------------------+-----+--------+-------------+-----------+--------------------------+---------+
+| + predict_kernel                                           | 20  |        |             |           |                          |         |
+|   add_ln22_fu_303_p2                                       |     |        | add_ln22    | add       | fabric                   | 0       |
+|  + predict_kernel_Pipeline_VITIS_LOOP_35_1                 | 0   |        |             |           |                          |         |
+|    icmp_ln35_fu_250_p2                                     |     |        | icmp_ln35   | seteq     | auto                     | 0       |
+|    add_ln35_fu_256_p2                                      |     |        | add_ln35    | add       | fabric                   | 0       |
+|    sparsemux_9_2_32_1_1_U9                                 |     |        | tmp         | sparsemux | compactencoding_dontcare | 0       |
+|  + predict_kernel_Pipeline_VITIS_LOOP_45_3_VITIS_LOOP_48_4 | 0   |        |             |           |                          |         |
+|    icmp_ln45_fu_297_p2                                     |     |        | icmp_ln45   | seteq     | auto                     | 0       |
+|    add_ln45_fu_303_p2                                      |     |        | add_ln45    | add       | fabric                   | 0       |
+|    icmp_ln48_fu_315_p2                                     |     |        | icmp_ln48   | seteq     | auto                     | 0       |
+|    select_ln32_fu_321_p3                                   |     |        | select_ln32 | select    | auto_sel                 | 0       |
+|    add_ln45_1_fu_329_p2                                    |     |        | add_ln45_1  | add       | fabric                   | 0       |
+|    select_ln45_fu_335_p3                                   |     |        | select_ln45 | select    | auto_sel                 | 0       |
+|    add_ln48_fu_367_p2                                      |     |        | add_ln48    | add       | fabric                   | 0       |
+|  + predict_kernel_Pipeline_VITIS_LOOP_59_6_VITIS_LOOP_61_7 | 0   |        |             |           |                          |         |
+|    icmp_ln59_fu_222_p2                                     |     |        | icmp_ln59   | seteq     | auto                     | 0       |
+|    add_ln59_fu_228_p2                                      |     |        | add_ln59    | add       | fabric                   | 0       |
+|    icmp_ln61_fu_240_p2                                     |     |        | icmp_ln61   | seteq     | auto                     | 0       |
+|    select_ln32_fu_246_p3                                   |     |        | select_ln32 | select    | auto_sel                 | 0       |
+|    add_ln59_1_fu_254_p2                                    |     |        | add_ln59_1  | add       | fabric                   | 0       |
+|    select_ln59_fu_260_p3                                   |     |        | select_ln59 | select    | auto_sel                 | 0       |
+|    add_ln63_fu_280_p2                                      |     |        | add_ln63    | add       | fabric                   | 0       |
+|    sparsemux_9_2_32_1_1_U48                                |     |        | tmp_1       | sparsemux | compactencoding_dontcare | 0       |
+|    add_ln61_fu_300_p2                                      |     |        | add_ln61    | add       | fabric                   | 0       |
++------------------------------------------------------------+-----+--------+-------------+-----------+--------------------------+---------+
+
+
+================================================================
+== Storage Report
+================================================================
+  No bind storage info in design
+
+================================================================
+== Pragma Report
+================================================================
+* Valid Pragma Syntax
++-----------------+--------------------------------+-------------------------------------------------------+
+| Type            | Options                        | Location                                              |
++-----------------+--------------------------------+-------------------------------------------------------+
+| ARRAY_PARTITION | variable=A complete dim=2      | in predict_kernel (../../src/hls/fpga_kernels.cpp:24) |
+| ARRAY_PARTITION | variable=p_x complete dim=1    | in predict_kernel (../../src/hls/fpga_kernels.cpp:25) |
+| ARRAY_PARTITION | variable=p_w complete dim=1    | in predict_kernel (../../src/hls/fpga_kernels.cpp:26) |
+| ARRAY_PARTITION | variable=p_pred complete dim=1 | in predict_kernel (../../src/hls/fpga_kernels.cpp:27) |
+| ARRAY_PARTITION | variable=H_x complete dim=1    | in predict_kernel (../../src/hls/fpga_kernels.cpp:29) |
+| ARRAY_PARTITION | variable=H_w complete dim=1    | in predict_kernel (../../src/hls/fpga_kernels.cpp:30) |
+| ARRAY_PARTITION | variable=H_pred complete dim=1 | in predict_kernel (../../src/hls/fpga_kernels.cpp:31) |
+| PIPELINE        | ii=1                           | in predict_kernel (../../src/hls/fpga_kernels.cpp:36) |
+| UNROLL          |                                | in predict_kernel (../../src/hls/fpga_kernels.cpp:39) |
+| LOOP_TRIPCOUNT  | min=0 max=32                   | in predict_kernel (../../src/hls/fpga_kernels.cpp:47) |
+| PIPELINE        | ii=1                           | in predict_kernel (../../src/hls/fpga_kernels.cpp:49) |
+| UNROLL          |                                | in predict_kernel (../../src/hls/fpga_kernels.cpp:52) |
+| LOOP_TRIPCOUNT  | min=0 max=32                   | in predict_kernel (../../src/hls/fpga_kernels.cpp:60) |
+| PIPELINE        | ii=1                           | in predict_kernel (../../src/hls/fpga_kernels.cpp:62) |
++-----------------+--------------------------------+-------------------------------------------------------+
+
+

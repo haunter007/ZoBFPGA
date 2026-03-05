@@ -1,0 +1,150 @@
+/src/hls/hls_component/
+/src/cpp/aco
+/data/input/ushant_ais/
+
+# macOS system
+.DS_Store
+__MACOSX/
+MacOSX_*
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Trashes
+.Spotlight-V100
+.VolumeIcon.icns
+com.apple.timemachine.donotpresent
+
+# VSCode
+.vscode/
+
+# Xcode
+*.xcworkspace
+*.xcodeproj
+DerivedData/
+build/
+
+# Python
+__pycache__/
+*.pyc
+
+# General
+*.log
+*.jou
+*.rpt
+*.vdi
+*.bak
+*.tmp
+*.debug
+*.str
+*.zip
+*.rst
+*.os
+*.js
+*.pb
+*.hwdef
+*.vds
+*.veo
+*.wdf
+*.dmp
+*.rpx
+.project
+
+# Bitstreams
+*.bit
+*.bin
+*.mcs
+*.svf
+*.image
+
+# Netlists
+*.edf
+*.edif
+*.vn
+*.vm
+
+# SDF
+*.sdf
+
+# Simulation dumps
+*.vcd
+*.saif
+*.tcf
+*.wdb
+
+# Others
+unisims
+
+# C / compiled files
+*.elf
+*.a
+*.sa
+*.so
+*.lib
+
+# Vivado dirs
+vivado.cache/
+vivado.hw/
+vivado.ip_user_files/
+vivado.runs/
+vivado.sim/
+
+# Xilinx Vivado / ISE
+.Xil/
+.cache/
+fsm_encoding.os
+tab_*/
+webtalk.*
+vivado_pid*.str
+hs_err_pid*
+xelab.*
+xsim.*
+xvlog.*
+*.sim
+*.runs
+*.hw
+*.backup.*
+
+# Checkpoints
+*.dcp
+
+# Eclipse / misc dirs
+*.metadata
+*.data
+*.ipdefs
+*.sdk
+
+# IP synth
+*_synth_*
+
+.jobs
+
+# Vivado directory files and directories
+vivado/cache/
+vivado/hw/
+vivado/ip_user_files/
+vivado/runs/
+vivado/sim/
+
+# Vivado BD files (keeping your specific files)
+vivado/bd/*
+!vivado/bd/design_1.bd
+!vivado/bd/design_1.tcl
+!vivado/bd/design_2.bd
+!vivado/bd/design_2.tcl
+!vivado/bd/design_3.bd
+!vivado/bd/design_3.tcl
+
+# Other Vivado files (making sure the exceptions are still applied)
+vivado/*
+!vivado/project.tcl
+
+# Ignore everything else in the ip directory, unless specifically kept
+vivado/bd/ip/*
+
+*.vho
+*.html
+
+# Misc Vivado outputs
+hw_handoff
+ipshared

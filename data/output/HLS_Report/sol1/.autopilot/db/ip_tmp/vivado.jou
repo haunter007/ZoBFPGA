@@ -1,0 +1,24 @@
+#-----------------------------------------------------------
+# Vivado v2025.2 (64-bit)
+# SW Build 6299465 on Fri Nov 14 12:34:56 MST 2025
+# IP Build 6300035 on Fri Nov 14 10:48:45 MST 2025
+# SharedData Build 6298862 on Thu Nov 13 04:50:51 MST 2025
+# Start of session at: Thu Mar  5 10:37:52 2026
+# Process ID         : 3315
+# Current directory  : /home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/ip_tmp
+# Command line       : vivado  -notrace -log vivado.log -mode batch -source run_vivado_gen_ip.tcl
+# Log file           : /home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/ip_tmp/vivado.log
+# Journal file       : /home/zzh/minkowski_fpga/data/output/HLS_Report/sol1/.autopilot/db/ip_tmp/vivado.jou
+# Running On         : ZHZ-Laptop
+# Platform           : Ubuntu
+# Operating System   : Ubuntu 24.04.3 LTS
+# Processor Detail   : AMD Ryzen 9 7945HX with Radeon Graphics
+# CPU Frequency      : 2495.267 MHz
+# CPU Physical cores : 16
+# CPU Logical cores  : 32
+# Host memory        : 8155 MB
+# Swap memory        : 2147 MB
+# Total Virtual      : 10303 MB
+# Available Virtual  : 9283 MB
+#-----------------------------------------------------------
+source run_vivado_gen_ip.tcl -notrace
