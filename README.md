@@ -1,7 +1,7 @@
 # 1. To run py and python vs hls
-cd ../hls                                                                                                                                                                                                                 
-python3 src/python/zonotope.py 
+cd ../src                                                                                                                                                                                                               
+python3 python/zonotope.py 
 
 # 2. To run hls
-cd ../hls 
+cd ../src/hls 
 make csim/synth/cosim
