@@ -329,10 +329,30 @@ void zonotope_step_kernel(
 #pragma HLS PIPELINE II=1
 #pragma HLS DEPENDENCE variable=H_inout inter false
             const data_t t = H_inout[meas_state][j];
-            for (int i = 0; i < N_STATE; ++i) {
-#pragma HLS UNROLL factor=STATE_PAR
-                H_inout[i][j] -= lambda[i] * t;
-            }
+            H_inout[ 0][j] -= lambda[ 0] * t;
+            H_inout[ 1][j] -= lambda[ 1] * t;
+            H_inout[ 2][j] -= lambda[ 2] * t;
+            H_inout[ 3][j] -= lambda[ 3] * t;
+            H_inout[ 4][j] -= lambda[ 4] * t;
+            H_inout[ 5][j] -= lambda[ 5] * t;
+            H_inout[ 6][j] -= lambda[ 6] * t;
+            H_inout[ 7][j] -= lambda[ 7] * t;
+            H_inout[ 8][j] -= lambda[ 8] * t;
+            H_inout[ 9][j] -= lambda[ 9] * t;
+            H_inout[10][j] -= lambda[10] * t;
+            H_inout[11][j] -= lambda[11] * t;
+            H_inout[12][j] -= lambda[12] * t;
+            H_inout[13][j] -= lambda[13] * t;
+            H_inout[14][j] -= lambda[14] * t;
+            H_inout[15][j] -= lambda[15] * t;
+            H_inout[16][j] -= lambda[16] * t;
+            H_inout[17][j] -= lambda[17] * t;
+            H_inout[18][j] -= lambda[18] * t;
+            H_inout[19][j] -= lambda[19] * t;
+            H_inout[20][j] -= lambda[20] * t;
+            H_inout[21][j] -= lambda[21] * t;
+            H_inout[22][j] -= lambda[22] * t;
+            H_inout[23][j] -= lambda[23] * t;
         }
 
         // Append phi*lambda as new generator
