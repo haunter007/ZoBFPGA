@@ -322,39 +322,22 @@ void compute_lambda_volume(
 }
 
 
-// ------------------------------
-// Reduce: box-preserving, in-place on H[N_STATE][MAX_GEN].
-//
-// Always reduces to REDUCTION_BUDGET = TOPK + N_STATE generators.
-// Layout after reduce:
-//   H[:,0..TOPK-1]              : top-TOPK kept generators (sorted by norm)
-//   H[:,TOPK..TOPK+N_STATE-1]   : diagonal overapproximation of dropped generators
-//   H[:,TOPK+N_STATE..MAX_GEN-1]: zeros
-//
-// H_kept[N_STATE][TOPK] replaces the old H_new[N_STATE][MAX_GEN] to stay in
-// LUT-affordable register storage (24×8 = 192 vs 24×64 = 1536 elements).
-// ------------------------------
-void zonotope_reduce(data_t H[N_STATE][MAX_GEN], int* m_ptr) {
-    static constexpr int REDUCE_STATE_PAR = 8;
-    static constexpr int REDUCE_STATE_BLOCKS = N_STATE / REDUCE_STATE_PAR;
-
-    const int m = *m_ptr;
-    if (m <= REDUCTION_BUDGET) return;
-
-    // 1) Compute L1 column norms.
-    //    The old fast branch behaved more like a cheap magnitude ranking than
-    //    a numerically careful Euclidean norm. Using L1 here removes the
-    //    sqrt/scale machinery while preserving a monotone "large column first"
-    //    ordering for reduction.
-    data_t col_norm[MAX_GEN];
+static void reduce_compute_l1_col_norms(
+    const data_t H[N_STATE][MAX_GEN],
+    int m,
+    data_t col_norm[MAX_GEN]
+) {
+    #pragma HLS INLINE off
+    #pragma HLS ARRAY_PARTITION variable=H complete dim=1
     #pragma HLS ARRAY_PARTITION variable=col_norm complete dim=1
+
     for (int j = 0; j < m; ++j) {
         #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
-        data_t sum_abs_blk[REDUCE_STATE_BLOCKS];
+        data_t sum_abs_blk[3];
         #pragma HLS ARRAY_PARTITION variable=sum_abs_blk complete dim=1
-        for (int blk = 0; blk < REDUCE_STATE_BLOCKS; ++blk) {
+        for (int blk = 0; blk < 3; ++blk) {
             #pragma HLS PIPELINE II=1
-            const int base = blk * REDUCE_STATE_PAR;
+            const int base = blk * 8;
             const data_t a0 = (H[base + 0][j] < 0.0f) ? -H[base + 0][j] : H[base + 0][j];
             const data_t a1 = (H[base + 1][j] < 0.0f) ? -H[base + 1][j] : H[base + 1][j];
             const data_t a2 = (H[base + 2][j] < 0.0f) ? -H[base + 2][j] : H[base + 2][j];
@@ -367,24 +350,26 @@ void zonotope_reduce(data_t H[N_STATE][MAX_GEN], int* m_ptr) {
         }
         col_norm[j] = sum_abs_blk[0] + sum_abs_blk[1] + sum_abs_blk[2];
     }
+}
 
-    // 2) Single-pass top-TOPK selection.
-    //    We only keep TOPK candidates. Guard slots (inf) are unnecessary because
-    //    min selection never needs to consider indices outside [0..TOPK-1].
+static void reduce_select_topk(
+    const data_t col_norm[MAX_GEN],
+    int m,
+    int top_idx[TOPK]
+) {
+    #pragma HLS INLINE off
+    #pragma HLS ARRAY_PARTITION variable=col_norm complete dim=1
+    #pragma HLS ARRAY_PARTITION variable=top_idx complete dim=1
+
     data_t top_vals[TOPK];
-    int    top_idx[TOPK];
     #pragma HLS ARRAY_PARTITION variable=top_vals complete dim=1
-    #pragma HLS ARRAY_PARTITION variable=top_idx  complete dim=1
 
     for (int k = 0; k < TOPK; ++k) {
         #pragma HLS UNROLL
         top_vals[k] = col_norm[k];
-        top_idx[k]  = k;
+        top_idx[k] = k;
     }
 
-    // Auto-pipelining this loop was landing at II=8 because the compare/update
-    // chain carries state across iterations. TOPK is only 8, so keeping this
-    // loop sequential is a better tradeoff while we reduce LUT pressure.
     for (int j = TOPK; j < m; ++j) {
         #pragma HLS PIPELINE off
         #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
@@ -403,9 +388,82 @@ void zonotope_reduce(data_t H[N_STATE][MAX_GEN], int* m_ptr) {
             top_idx[min_k] = j;
         }
     }
+}
 
-    // 3) Save top-TOPK columns into compact H_kept[N_STATE][TOPK].
-    //    TOPK = 8 → only 192 registers vs 1536 for H_new[N_STATE][MAX_GEN].
+static void reduce_accumulate_diag(
+    const data_t H[N_STATE][MAX_GEN],
+    int m,
+    const int top_idx[TOPK],
+    data_t d[N_STATE]
+) {
+    #pragma HLS INLINE off
+    #pragma HLS ARRAY_PARTITION variable=H complete dim=1
+    #pragma HLS ARRAY_PARTITION variable=top_idx complete dim=1
+    #pragma HLS ARRAY_PARTITION variable=d complete dim=1
+
+    static constexpr int REDUCE_STATE_PAR = 8;
+    static constexpr int REDUCE_STATE_BLOCKS = N_STATE / REDUCE_STATE_PAR;
+    const int ACCUM_LANES = 4;
+
+    bool kept_flag[MAX_GEN];
+    #pragma HLS ARRAY_PARTITION variable=kept_flag complete dim=1
+    for (int j = 0; j < MAX_GEN; ++j) {
+        #pragma HLS UNROLL
+        kept_flag[j] = false;
+    }
+    for (int k = 0; k < TOPK; ++k) {
+        #pragma HLS UNROLL
+        kept_flag[top_idx[k]] = true;
+    }
+
+    data_t d_acc[ACCUM_LANES][N_STATE];
+    #pragma HLS ARRAY_PARTITION variable=d_acc complete dim=1
+    #pragma HLS ARRAY_PARTITION variable=d_acc complete dim=2
+    for (int l = 0; l < ACCUM_LANES; ++l) {
+        #pragma HLS UNROLL
+        for (int i = 0; i < N_STATE; ++i) {
+            #pragma HLS UNROLL
+            d_acc[l][i] = 0.0f;
+        }
+    }
+
+    for (int j = 0; j < m; ++j) {
+        #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
+        const int lane = j & (ACCUM_LANES - 1);
+        if (!kept_flag[j]) {
+            for (int blk = 0; blk < REDUCE_STATE_BLOCKS; ++blk) {
+                #pragma HLS PIPELINE II=1
+                const int base = blk * REDUCE_STATE_PAR;
+                for (int i = 0; i < REDUCE_STATE_PAR; ++i) {
+                    #pragma HLS UNROLL
+                    const data_t v = H[base + i][j];
+                    d_acc[lane][base + i] += (v < 0.0f ? -v : v);
+                }
+            }
+        }
+    }
+
+    for (int i = 0; i < N_STATE; ++i) {
+        #pragma HLS UNROLL
+        data_t s = 0.0f;
+        for (int l = 0; l < ACCUM_LANES; ++l) {
+            #pragma HLS UNROLL
+            s += d_acc[l][i];
+        }
+        d[i] = s;
+    }
+}
+
+static void reduce_writeback(
+    data_t H[N_STATE][MAX_GEN],
+    const int top_idx[TOPK],
+    const data_t d[N_STATE]
+) {
+    #pragma HLS INLINE off
+    #pragma HLS ARRAY_PARTITION variable=H complete dim=1
+    #pragma HLS ARRAY_PARTITION variable=top_idx complete dim=1
+    #pragma HLS ARRAY_PARTITION variable=d complete dim=1
+
     data_t H_kept[N_STATE][TOPK];
     #pragma HLS ARRAY_PARTITION variable=H_kept complete dim=1
     #pragma HLS ARRAY_PARTITION variable=H_kept complete dim=2
@@ -419,59 +477,6 @@ void zonotope_reduce(data_t H[N_STATE][MAX_GEN], int* m_ptr) {
         }
     }
 
-    // 4) Build kept_flag and row-sum dropped columns.
-    bool kept_flag[MAX_GEN];
-    #pragma HLS ARRAY_PARTITION variable=kept_flag complete dim=1
-    for (int j = 0; j < MAX_GEN; ++j) {
-        #pragma HLS UNROLL
-        kept_flag[j] = false;
-    }
-    for (int k = 0; k < TOPK; ++k) {
-        #pragma HLS UNROLL
-        kept_flag[top_idx[k]] = true;
-    }
-
-    const int ACCUM_LANES = 4;
-    data_t d_acc[ACCUM_LANES][N_STATE];
-    #pragma HLS ARRAY_PARTITION variable=d_acc complete dim=1
-    #pragma HLS ARRAY_PARTITION variable=d_acc complete dim=2
-    for (int l = 0; l < ACCUM_LANES; ++l) {
-        #pragma HLS UNROLL
-        for (int i = 0; i < N_STATE; ++i) {
-            #pragma HLS UNROLL
-            d_acc[l][i] = 0.0f;
-        }
-    }
-    for (int j = 0; j < m; ++j) {
-        #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
-        const int lane = j & (ACCUM_LANES - 1);
-        const data_t w = kept_flag[j] ? 0.0f : 1.0f;
-        for (int blk = 0; blk < REDUCE_STATE_BLOCKS; ++blk) {
-            #pragma HLS PIPELINE II=1
-            const int base = blk * REDUCE_STATE_PAR;
-            for (int i = 0; i < REDUCE_STATE_PAR; ++i) {
-                #pragma HLS UNROLL
-                const data_t v = H[base + i][j];
-                d_acc[lane][base + i] += w * (v < 0.0f ? -v : v);
-            }
-        }
-    }
-    data_t d[N_STATE];
-    #pragma HLS ARRAY_PARTITION variable=d complete dim=1
-    for (int i = 0; i < N_STATE; ++i) {
-        #pragma HLS UNROLL
-        data_t s = 0.0f;
-        for (int l = 0; l < ACCUM_LANES; ++l) {
-            #pragma HLS UNROLL
-            s += d_acc[l][i];
-        }
-        d[i] = s;
-    }
-
-    // 5) Write result directly into H (no H_new copy needed):
-    //    Columns 0..TOPK-1         : H_kept (kept generators) — static addressing
-    //    Columns TOPK..TOPK+N_STATE-1 : diagonal d[] — static addressing (TOPK is const)
-    //    Columns TOPK+N_STATE..MAX_GEN-1 : zeros — static addressing
     for (int k = 0; k < TOPK; ++k) {
         #pragma HLS UNROLL
         for (int i = 0; i < N_STATE; ++i) {
@@ -488,7 +493,7 @@ void zonotope_reduce(data_t H[N_STATE][MAX_GEN], int* m_ptr) {
     }
     for (int i = 0; i < N_STATE; ++i) {
         #pragma HLS UNROLL
-        H[i][TOPK + i] = d[i];           // TOPK is compile-time → static column address
+        H[i][TOPK + i] = d[i];
     }
     for (int j = REDUCTION_BUDGET; j < MAX_GEN; ++j) {
         #pragma HLS UNROLL
@@ -497,8 +502,30 @@ void zonotope_reduce(data_t H[N_STATE][MAX_GEN], int* m_ptr) {
             H[i][j] = 0.0f;
         }
     }
+}
 
-    *m_ptr = REDUCTION_BUDGET;            // = TOPK + N_STATE, compile-time constant
+// ------------------------------
+// Reduce: box-preserving, in-place on H[N_STATE][MAX_GEN].
+// ------------------------------
+void zonotope_reduce(data_t H[N_STATE][MAX_GEN], int* m_ptr) {
+    #pragma HLS ARRAY_PARTITION variable=H complete dim=1
+
+    const int m = *m_ptr;
+    if (m <= REDUCTION_BUDGET) return;
+
+    data_t col_norm[MAX_GEN];
+    int top_idx[TOPK];
+    data_t d[N_STATE];
+    #pragma HLS ARRAY_PARTITION variable=col_norm complete dim=1
+    #pragma HLS ARRAY_PARTITION variable=top_idx complete dim=1
+    #pragma HLS ARRAY_PARTITION variable=d complete dim=1
+
+    reduce_compute_l1_col_norms(H, m, col_norm);
+    reduce_select_topk(col_norm, m, top_idx);
+    reduce_accumulate_diag(H, m, top_idx, d);
+    reduce_writeback(H, top_idx, d);
+
+    *m_ptr = REDUCTION_BUDGET;
 }
 
 
