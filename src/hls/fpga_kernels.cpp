@@ -249,6 +249,7 @@ void zonotope_step_kernel(
 #pragma HLS ARRAY_PARTITION variable=col_tmp complete dim=1
     for (int k = 0; k < m; ++k) {
 #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
+#pragma HLS DEPENDENCE variable=H_inout inter false
         for (int b = 0; b < OSC_BLOCKS; ++b) {
 #pragma HLS PIPELINE II=1
             const int base = b * OSC_BLOCK_SIZE;
@@ -274,26 +275,19 @@ void zonotope_step_kernel(
                               + A[base + 3][base + 2] * h2
                               + A[base + 3][base + 3] * h3;
         }
-        for (int blk = 0; blk < STATE_BLOCKS; ++blk) {
-#pragma HLS PIPELINE II=1
-            for (int lane = 0; lane < STATE_PAR; ++lane) {
-#pragma HLS UNROLL
-                const int row = blk * STATE_PAR + lane;
-                H_inout[row][k] = col_tmp[row];
-            }
+        for (int i = 0; i < N_STATE; ++i) {
+#pragma HLS UNROLL factor=STATE_PAR
+            H_inout[i][k] = col_tmp[i];
         }
     }
 
     // 1c. Append process-noise generators H_w
     for (int k = 0; k < m_w; ++k) {
 #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
-        for (int blk = 0; blk < STATE_BLOCKS; ++blk) {
-#pragma HLS PIPELINE II=1
-            for (int lane = 0; lane < STATE_PAR; ++lane) {
-#pragma HLS UNROLL
-                const int row = blk * STATE_PAR + lane;
-                H_inout[row][m + k] = H_w[row][k];
-            }
+#pragma HLS DEPENDENCE variable=H_inout inter false
+        for (int i = 0; i < N_STATE; ++i) {
+#pragma HLS UNROLL factor=STATE_PAR
+            H_inout[i][m + k] = H_w[i][k];
         }
     }
     m += m_w;
@@ -321,39 +315,30 @@ void zonotope_step_kernel(
         const data_t r = y[meas] - residual;
 
         // p += lambda * r  (in-place)
-        for (int blk = 0; blk < STATE_BLOCKS; ++blk) {
-#pragma HLS PIPELINE II=1
-            for (int lane = 0; lane < STATE_PAR; ++lane) {
-#pragma HLS UNROLL
-                const int row = blk * STATE_PAR + lane;
-                p_inout[row] += lambda[row] * r;
-            }
+        for (int i = 0; i < N_STATE; ++i) {
+#pragma HLS UNROLL factor=STATE_PAR
+            p_inout[i] += lambda[i] * r;
         }
 
-        // Update H a bank-aligned block at a time. This avoids the scheduler
-        // turning the whole 24-row loop into a single fully-unrolled access
-        // burst that exceeds the 8-way cyclic partition on H_inout.
+        // Update H a bank-aligned block at a time. Keep only half a bank
+        // active per cycle here; the recovered fast lambda path already
+        // pushes timing hard, and the full 8-lane update becomes the
+        // dominant critical path at fpga_kernels.cpp:344.
         for (int j = 0; j < m; ++j) {
-            const data_t t = H_inout[meas_state][j];
-            for (int blk = 0; blk < STATE_BLOCKS; ++blk) {
-#pragma HLS PIPELINE II=1
 #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
-                for (int lane = 0; lane < STATE_PAR; ++lane) {
-#pragma HLS UNROLL
-                    const int row = blk * STATE_PAR + lane;
-                    H_inout[row][j] -= lambda[row] * t;
-                }
+#pragma HLS PIPELINE II=1
+#pragma HLS DEPENDENCE variable=H_inout inter false
+            const data_t t = H_inout[meas_state][j];
+            for (int i = 0; i < N_STATE; ++i) {
+#pragma HLS UNROLL factor=STATE_PAR
+                H_inout[i][j] -= lambda[i] * t;
             }
         }
 
         // Append phi*lambda as new generator
-        for (int blk = 0; blk < STATE_BLOCKS; ++blk) {
-#pragma HLS PIPELINE II=1
-            for (int lane = 0; lane < STATE_PAR; ++lane) {
-#pragma HLS UNROLL
-                const int row = blk * STATE_PAR + lane;
-                H_inout[row][m] = phi[meas] * lambda[row];
-            }
+        for (int i = 0; i < N_STATE; ++i) {
+#pragma HLS UNROLL factor=STATE_PAR
+            H_inout[i][m] = phi[meas] * lambda[i];
         }
         m += 1;
     }

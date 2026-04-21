@@ -73,10 +73,14 @@ proc patch_generated_xsim_script {sim_verilog_dir top} {
   set content [read $fh]
   close $fh
 
-  set patched [string map [list \
-    [format {xsim {%s}} $top] [format {xsim %s} $top] \
-    [format {-tclbatch {%s.tcl}} $top] [format {-tclbatch %s.tcl} $top] \
-  ] $content]
+  set patched $content
+  regsub -all -- [format {xsim\s+\{%s\}} $top] $patched [format {xsim %s} $top] patched
+  regsub -all -- [format {-tclbatch\s+\{%s\.tcl\}} $top] $patched [format {-tclbatch %s.tcl} $top] patched
+
+  if {$patched eq $content && [regexp {^xsim\s+\{([^\}]+)\}(.*)-tclbatch\s+\{([^\}]+)\}\s*$} [string trim $content] -> snap mid batch]} {
+    set patched [string trim [format {xsim %s%s-tclbatch %s} $snap $mid $batch]]
+    append patched "\n"
+  }
 
   if {$patched ne $content} {
     set fh [open $script_path w]
@@ -102,40 +106,28 @@ proc run_manual_cosim_fallback {proj top} {
   close $fh
 
   set xelab_cmd ""
-  set xsim_cmd ""
   foreach line $raw_lines {
     set line [string trim $line]
-    if {$line eq ""} {
-      continue
-    }
-    if {$xelab_cmd eq ""} {
+    if {$line ne ""} {
       set xelab_cmd $line
-    } elseif {$xsim_cmd eq ""} {
-      set xsim_cmd $line
       break
     }
   }
+  if {$xelab_cmd eq ""} {
+    error "manual cosim fallback could not parse xelab command from $run_xsim_path"
+  }
 
-  if {$xelab_cmd eq "" || $xsim_cmd eq ""} {
-    error "manual cosim fallback could not parse xelab/xsim commands from $run_xsim_path"
+  if {![regexp {(^|[[:space:]])-R($|[[:space:]])} $xelab_cmd]} {
+    append xelab_cmd " -R"
   }
 
   set prev_dir [pwd]
   cd $sim_verilog_dir
-  puts "INFO: manual cosim fallback running xelab"
+  puts "INFO: manual cosim fallback running xelab -R"
   set ret [catch {exec sh -lc $xelab_cmd >&@ stdout} err]
   if {$ret} {
     cd $prev_dir
-    error "manual cosim fallback xelab failed: $err"
-  }
-
-  patch_generated_xsim_script $sim_verilog_dir $top
-
-  puts "INFO: manual cosim fallback running xsim"
-  set ret [catch {exec sh -lc $xsim_cmd >&@ stdout} err]
-  if {$ret} {
-    cd $prev_dir
-    error "manual cosim fallback xsim failed: $err"
+    error "manual cosim fallback xelab -R failed: $err"
   }
 
   set tvout_path [file normalize [file join $sim_verilog_dir ".." "tv" "rtldatafile" "rtl.${top}.autotvout_state_port.dat"]]

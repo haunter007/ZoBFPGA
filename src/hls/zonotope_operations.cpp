@@ -11,124 +11,58 @@ void compute_lambda_segment(
     int c_idx,
     data_t phi
 ) {
-    // Keep this kernel as a standalone scheduled region. Inlining it into the
-    // batch top aggravated the already-critical lambda path in synthesis.
-    #pragma HLS INLINE off
+    #pragma HLS ARRAY_PARTITION variable=H complete dim=1
+    #pragma HLS ARRAY_PARTITION variable=lambda complete dim=1
 
-    // A narrower lane factor reduces the fmul/fadd fan-out in the segment
-    // lambda reduction tree. The goal here is timing closure for the batch
-    // kernel, not the shortest possible csim estimate.
-    static constexpr int LAMBDA_STATE_PAR = 4;
-    static constexpr int LAMBDA_STATE_BLOCKS = N_STATE / LAMBDA_STATE_PAR;
-
-    #pragma HLS ARRAY_PARTITION variable=H cyclic factor=LAMBDA_STATE_PAR dim=1
-    #pragma HLS ARRAY_PARTITION variable=lambda cyclic factor=LAMBDA_STATE_PAR dim=1
-
-    // Normalize H by its max magnitude before forming HHT_c. This preserves
-    // lambda exactly while avoiding h*h overflow in single precision.
-    data_t h_scale = 0.0f;
-    for (int j = 0; j < m; ++j) {
-        #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
-        for (int blk = 0; blk < LAMBDA_STATE_BLOCKS; ++blk) {
-            #pragma HLS PIPELINE II=1
-            const int base = blk * LAMBDA_STATE_PAR;
-            const data_t a0 = (H[base + 0][j] < 0.0f) ? -H[base + 0][j] : H[base + 0][j];
-            const data_t a1 = (H[base + 1][j] < 0.0f) ? -H[base + 1][j] : H[base + 1][j];
-            const data_t a2 = (H[base + 2][j] < 0.0f) ? -H[base + 2][j] : H[base + 2][j];
-            const data_t a3 = (H[base + 3][j] < 0.0f) ? -H[base + 3][j] : H[base + 3][j];
-            const data_t a4 = (H[base + 4][j] < 0.0f) ? -H[base + 4][j] : H[base + 4][j];
-            const data_t a5 = (H[base + 5][j] < 0.0f) ? -H[base + 5][j] : H[base + 5][j];
-            const data_t a6 = (H[base + 6][j] < 0.0f) ? -H[base + 6][j] : H[base + 6][j];
-            const data_t a7 = (H[base + 7][j] < 0.0f) ? -H[base + 7][j] : H[base + 7][j];
-
-            const data_t m01 = (a0 > a1) ? a0 : a1;
-            const data_t m23 = (a2 > a3) ? a2 : a3;
-            const data_t m45 = (a4 > a5) ? a4 : a5;
-            const data_t m67 = (a6 > a7) ? a6 : a7;
-            const data_t m0123 = (m01 > m23) ? m01 : m23;
-            const data_t m4567 = (m45 > m67) ? m45 : m67;
-            const data_t block_max = (m0123 > m4567) ? m0123 : m4567;
-            h_scale = (block_max > h_scale) ? block_max : h_scale;
-        }
-    }
-
-    if (h_scale < 1e-20f) {
-        for (int blk = 0; blk < LAMBDA_STATE_BLOCKS; ++blk) {
-            const int base = blk * LAMBDA_STATE_PAR;
-            for (int lane = 0; lane < LAMBDA_STATE_PAR; ++lane) {
-                #pragma HLS UNROLL
-                lambda[base + lane] = 0.0f;
-            }
-        }
-        return;
-    }
-
-    const data_t inv_h_scale = 1.0f / h_scale;
-
-    // HHT_c_norm = (H/h_scale) * ((H/h_scale)^T * c)
     const int ACCUM_LANES = 4;
     data_t HHT_c_acc[ACCUM_LANES][N_STATE];
     #pragma HLS ARRAY_PARTITION variable=HHT_c_acc complete dim=1
-    #pragma HLS ARRAY_PARTITION variable=HHT_c_acc cyclic factor=LAMBDA_STATE_PAR dim=2
+    #pragma HLS ARRAY_PARTITION variable=HHT_c_acc complete dim=2
+
     for (int l = 0; l < ACCUM_LANES; ++l) {
-        for (int blk = 0; blk < LAMBDA_STATE_BLOCKS; ++blk) {
-            const int base = blk * LAMBDA_STATE_PAR;
-            for (int lane = 0; lane < LAMBDA_STATE_PAR; ++lane) {
-                #pragma HLS UNROLL
-                HHT_c_acc[l][base + lane] = 0.0f;
-            }
+        #pragma HLS UNROLL
+        for (int i = 0; i < N_STATE; ++i) {
+            #pragma HLS UNROLL
+            HHT_c_acc[l][i] = 0.0f;
         }
     }
 
     for (int j = 0; j < m; ++j) {
+        #pragma HLS PIPELINE II=1
         #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
         const int lane = j & (ACCUM_LANES - 1);
-        const data_t h_dot_c = H[c_idx][j] * inv_h_scale;
-        for (int blk = 0; blk < LAMBDA_STATE_BLOCKS; ++blk) {
-            #pragma HLS PIPELINE II=1
-            const int base = blk * LAMBDA_STATE_PAR;
-            for (int ii = 0; ii < LAMBDA_STATE_PAR; ++ii) {
-                #pragma HLS UNROLL
-                HHT_c_acc[lane][base + ii] += (H[base + ii][j] * inv_h_scale) * h_dot_c;
-            }
+        const data_t h_dot_c = H[c_idx][j];
+        for (int i = 0; i < N_STATE; ++i) {
+            #pragma HLS UNROLL
+            HHT_c_acc[lane][i] += H[i][j] * h_dot_c;
         }
     }
 
     data_t HHT_c[N_STATE];
-    #pragma HLS ARRAY_PARTITION variable=HHT_c cyclic factor=LAMBDA_STATE_PAR dim=1
-    for (int blk = 0; blk < LAMBDA_STATE_BLOCKS; ++blk) {
-        const int base = blk * LAMBDA_STATE_PAR;
-        for (int ii = 0; ii < LAMBDA_STATE_PAR; ++ii) {
+    #pragma HLS ARRAY_PARTITION variable=HHT_c complete dim=1
+    for (int i = 0; i < N_STATE; ++i) {
+        #pragma HLS UNROLL
+        data_t sum = 0.0f;
+        for (int l = 0; l < ACCUM_LANES; ++l) {
             #pragma HLS UNROLL
-            data_t sum = 0.0f;
-            for (int l = 0; l < ACCUM_LANES; ++l) {
-                #pragma HLS UNROLL
-                sum += HHT_c_acc[l][base + ii];
-            }
-            HHT_c[base + ii] = sum;
+            sum += HHT_c_acc[l][i];
         }
+        HHT_c[i] = sum;
     }
 
-    const data_t phi_norm = phi * inv_h_scale;
-    data_t denom = phi_norm * phi_norm + HHT_c[c_idx];
-
+    const data_t denom = phi * phi + HHT_c[c_idx];
     if (std::fabs(denom) < 1e-12f) {
-        for (int blk = 0; blk < LAMBDA_STATE_BLOCKS; ++blk) {
-            const int base = blk * LAMBDA_STATE_PAR;
-            for (int ii = 0; ii < LAMBDA_STATE_PAR; ++ii) {
-                #pragma HLS UNROLL
-                lambda[base + ii] = 0.0f;
-            }
+        for (int i = 0; i < N_STATE; ++i) {
+            #pragma HLS UNROLL
+            lambda[i] = 0.0f;
         }
-    } else {
-        const data_t inv_denom = 1.0f / denom;
-        for (int blk = 0; blk < LAMBDA_STATE_BLOCKS; ++blk) {
-            const int base = blk * LAMBDA_STATE_PAR;
-            for (int ii = 0; ii < LAMBDA_STATE_PAR; ++ii) {
-                #pragma HLS UNROLL
-                lambda[base + ii] = HHT_c[base + ii] * inv_denom;
-            }
-        }
+        return;
+    }
+
+    const data_t inv_denom = 1.0f / denom;
+    for (int i = 0; i < N_STATE; ++i) {
+        #pragma HLS UNROLL
+        lambda[i] = HHT_c[i] * inv_denom;
     }
 }
 
@@ -407,14 +341,17 @@ void zonotope_reduce(data_t H[N_STATE][MAX_GEN], int* m_ptr) {
     const int m = *m_ptr;
     if (m <= REDUCTION_BUDGET) return;
 
-    // 1) Compute L2 column norms with safe scaling:
-    //    norm = scale * sqrt(sum((h_i/scale)^2)).
-    //    This preserves Euclidean-norm ordering without h*h overflow.
+    // 1) Compute L1 column norms.
+    //    The old fast branch behaved more like a cheap magnitude ranking than
+    //    a numerically careful Euclidean norm. Using L1 here removes the
+    //    sqrt/scale machinery while preserving a monotone "large column first"
+    //    ordering for reduction.
     data_t col_norm[MAX_GEN];
     #pragma HLS ARRAY_PARTITION variable=col_norm complete dim=1
     for (int j = 0; j < m; ++j) {
         #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
-        data_t scale = 0.0f;
+        data_t sum_abs_blk[REDUCE_STATE_BLOCKS];
+        #pragma HLS ARRAY_PARTITION variable=sum_abs_blk complete dim=1
         for (int blk = 0; blk < REDUCE_STATE_BLOCKS; ++blk) {
             #pragma HLS PIPELINE II=1
             const int base = blk * REDUCE_STATE_PAR;
@@ -426,46 +363,9 @@ void zonotope_reduce(data_t H[N_STATE][MAX_GEN], int* m_ptr) {
             const data_t a5 = (H[base + 5][j] < 0.0f) ? -H[base + 5][j] : H[base + 5][j];
             const data_t a6 = (H[base + 6][j] < 0.0f) ? -H[base + 6][j] : H[base + 6][j];
             const data_t a7 = (H[base + 7][j] < 0.0f) ? -H[base + 7][j] : H[base + 7][j];
-
-            const data_t m01 = (a0 > a1) ? a0 : a1;
-            const data_t m23 = (a2 > a3) ? a2 : a3;
-            const data_t m45 = (a4 > a5) ? a4 : a5;
-            const data_t m67 = (a6 > a7) ? a6 : a7;
-            const data_t m0123 = (m01 > m23) ? m01 : m23;
-            const data_t m4567 = (m45 > m67) ? m45 : m67;
-            const data_t block_max = (m0123 > m4567) ? m0123 : m4567;
-            scale = (block_max > scale) ? block_max : scale;
+            sum_abs_blk[blk] = a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7;
         }
-        if (scale < 1e-20f) {
-            col_norm[j] = 0.0f;
-            continue;
-        }
-
-        const data_t inv_scale = 1.0f / scale;
-        data_t sum_sq_blk[REDUCE_STATE_BLOCKS];
-        #pragma HLS ARRAY_PARTITION variable=sum_sq_blk complete dim=1
-        for (int blk = 0; blk < REDUCE_STATE_BLOCKS; ++blk) {
-            #pragma HLS PIPELINE II=1
-            const int base = blk * REDUCE_STATE_PAR;
-            const data_t v0 = H[base + 0][j] * inv_scale;
-            const data_t v1 = H[base + 1][j] * inv_scale;
-            const data_t v2 = H[base + 2][j] * inv_scale;
-            const data_t v3 = H[base + 3][j] * inv_scale;
-            const data_t v4 = H[base + 4][j] * inv_scale;
-            const data_t v5 = H[base + 5][j] * inv_scale;
-            const data_t v6 = H[base + 6][j] * inv_scale;
-            const data_t v7 = H[base + 7][j] * inv_scale;
-
-            const data_t s01 = v0 * v0 + v1 * v1;
-            const data_t s23 = v2 * v2 + v3 * v3;
-            const data_t s45 = v4 * v4 + v5 * v5;
-            const data_t s67 = v6 * v6 + v7 * v7;
-            const data_t s0123 = s01 + s23;
-            const data_t s4567 = s45 + s67;
-            sum_sq_blk[blk] = s0123 + s4567;
-        }
-        const data_t sum_sq = sum_sq_blk[0] + sum_sq_blk[1] + sum_sq_blk[2];
-        col_norm[j] = scale * std::sqrt(sum_sq);
+        col_norm[j] = sum_abs_blk[0] + sum_abs_blk[1] + sum_abs_blk[2];
     }
 
     // 2) Single-pass top-TOPK selection.
