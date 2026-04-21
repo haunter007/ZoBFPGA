@@ -8,34 +8,132 @@
 void compute_lambda_segment(
     data_t lambda[N_STATE],
     const data_t H[N_STATE][MAX_GEN], int m,
-    const data_t c[N_STATE],
+    int c_idx,
     data_t phi
 ) {
-    // HHT_c = H * (H^T * c)
-    data_t HHT_c[N_STATE] = {0.0};
+    // Keep this kernel as a standalone scheduled region. Inlining it into the
+    // batch top aggravated the already-critical lambda path in synthesis.
+    #pragma HLS INLINE off
+
+    // A narrower lane factor reduces the fmul/fadd fan-out in the segment
+    // lambda reduction tree. The goal here is timing closure for the batch
+    // kernel, not the shortest possible csim estimate.
+    static constexpr int LAMBDA_STATE_PAR = 4;
+    static constexpr int LAMBDA_STATE_BLOCKS = N_STATE / LAMBDA_STATE_PAR;
+
+    #pragma HLS ARRAY_PARTITION variable=H cyclic factor=LAMBDA_STATE_PAR dim=1
+    #pragma HLS ARRAY_PARTITION variable=lambda cyclic factor=LAMBDA_STATE_PAR dim=1
+
+    // Normalize H by its max magnitude before forming HHT_c. This preserves
+    // lambda exactly while avoiding h*h overflow in single precision.
+    data_t h_scale = 0.0f;
+    for (int j = 0; j < m; ++j) {
+        #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
+        for (int blk = 0; blk < LAMBDA_STATE_BLOCKS; ++blk) {
+            #pragma HLS PIPELINE II=1
+            const int base = blk * LAMBDA_STATE_PAR;
+            const data_t a0 = (H[base + 0][j] < 0.0f) ? -H[base + 0][j] : H[base + 0][j];
+            const data_t a1 = (H[base + 1][j] < 0.0f) ? -H[base + 1][j] : H[base + 1][j];
+            const data_t a2 = (H[base + 2][j] < 0.0f) ? -H[base + 2][j] : H[base + 2][j];
+            const data_t a3 = (H[base + 3][j] < 0.0f) ? -H[base + 3][j] : H[base + 3][j];
+            const data_t a4 = (H[base + 4][j] < 0.0f) ? -H[base + 4][j] : H[base + 4][j];
+            const data_t a5 = (H[base + 5][j] < 0.0f) ? -H[base + 5][j] : H[base + 5][j];
+            const data_t a6 = (H[base + 6][j] < 0.0f) ? -H[base + 6][j] : H[base + 6][j];
+            const data_t a7 = (H[base + 7][j] < 0.0f) ? -H[base + 7][j] : H[base + 7][j];
+
+            const data_t m01 = (a0 > a1) ? a0 : a1;
+            const data_t m23 = (a2 > a3) ? a2 : a3;
+            const data_t m45 = (a4 > a5) ? a4 : a5;
+            const data_t m67 = (a6 > a7) ? a6 : a7;
+            const data_t m0123 = (m01 > m23) ? m01 : m23;
+            const data_t m4567 = (m45 > m67) ? m45 : m67;
+            const data_t block_max = (m0123 > m4567) ? m0123 : m4567;
+            h_scale = (block_max > h_scale) ? block_max : h_scale;
+        }
+    }
+
+    if (h_scale < 1e-20f) {
+        for (int blk = 0; blk < LAMBDA_STATE_BLOCKS; ++blk) {
+            const int base = blk * LAMBDA_STATE_PAR;
+            for (int lane = 0; lane < LAMBDA_STATE_PAR; ++lane) {
+                #pragma HLS UNROLL
+                lambda[base + lane] = 0.0f;
+            }
+        }
+        return;
+    }
+
+    const data_t inv_h_scale = 1.0f / h_scale;
+
+    // HHT_c_norm = (H/h_scale) * ((H/h_scale)^T * c)
+    const int ACCUM_LANES = 4;
+    data_t HHT_c_acc[ACCUM_LANES][N_STATE];
+    #pragma HLS ARRAY_PARTITION variable=HHT_c_acc complete dim=1
+    #pragma HLS ARRAY_PARTITION variable=HHT_c_acc cyclic factor=LAMBDA_STATE_PAR dim=2
+    for (int l = 0; l < ACCUM_LANES; ++l) {
+        for (int blk = 0; blk < LAMBDA_STATE_BLOCKS; ++blk) {
+            const int base = blk * LAMBDA_STATE_PAR;
+            for (int lane = 0; lane < LAMBDA_STATE_PAR; ++lane) {
+                #pragma HLS UNROLL
+                HHT_c_acc[l][base + lane] = 0.0f;
+            }
+        }
+    }
 
     for (int j = 0; j < m; ++j) {
-        data_t h_dot_c = 0.0;
-        for (int i = 0; i < N_STATE; ++i) {
-            h_dot_c += H[i][j] * c[i];
-        }
-        for (int i = 0; i < N_STATE; ++i) {
-            HHT_c[i] += H[i][j] * h_dot_c;
+        #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
+        const int lane = j & (ACCUM_LANES - 1);
+        const data_t h_dot_c = H[c_idx][j] * inv_h_scale;
+        for (int blk = 0; blk < LAMBDA_STATE_BLOCKS; ++blk) {
+            #pragma HLS PIPELINE II=1
+            const int base = blk * LAMBDA_STATE_PAR;
+            for (int ii = 0; ii < LAMBDA_STATE_PAR; ++ii) {
+                #pragma HLS UNROLL
+                HHT_c_acc[lane][base + ii] += (H[base + ii][j] * inv_h_scale) * h_dot_c;
+            }
         }
     }
 
-    data_t denom = phi * phi;
-    for (int i = 0; i < N_STATE; ++i) {
-        denom += c[i] * HHT_c[i];
+    data_t HHT_c[N_STATE];
+    #pragma HLS ARRAY_PARTITION variable=HHT_c cyclic factor=LAMBDA_STATE_PAR dim=1
+    for (int blk = 0; blk < LAMBDA_STATE_BLOCKS; ++blk) {
+        const int base = blk * LAMBDA_STATE_PAR;
+        for (int ii = 0; ii < LAMBDA_STATE_PAR; ++ii) {
+            #pragma HLS UNROLL
+            data_t sum = 0.0f;
+            for (int l = 0; l < ACCUM_LANES; ++l) {
+                #pragma HLS UNROLL
+                sum += HHT_c_acc[l][base + ii];
+            }
+            HHT_c[base + ii] = sum;
+        }
     }
 
-    if (std::fabs(denom) < 1e-12) {
-        for (int i = 0; i < N_STATE; ++i) lambda[i] = 0.0;
+    const data_t phi_norm = phi * inv_h_scale;
+    data_t denom = phi_norm * phi_norm + HHT_c[c_idx];
+
+    if (std::fabs(denom) < 1e-12f) {
+        for (int blk = 0; blk < LAMBDA_STATE_BLOCKS; ++blk) {
+            const int base = blk * LAMBDA_STATE_PAR;
+            for (int ii = 0; ii < LAMBDA_STATE_PAR; ++ii) {
+                #pragma HLS UNROLL
+                lambda[base + ii] = 0.0f;
+            }
+        }
     } else {
-        for (int i = 0; i < N_STATE; ++i) lambda[i] = HHT_c[i] / denom;
+        const data_t inv_denom = 1.0f / denom;
+        for (int blk = 0; blk < LAMBDA_STATE_BLOCKS; ++blk) {
+            const int base = blk * LAMBDA_STATE_PAR;
+            for (int ii = 0; ii < LAMBDA_STATE_PAR; ++ii) {
+                #pragma HLS UNROLL
+                lambda[base + ii] = HHT_c[base + ii] * inv_denom;
+            }
+        }
     }
 }
 
+// LAMBDA_P_RADIUS disabled for now.
+#if 0
 // ------------------------------
 // Lambda: P-radius
 // 说明：Python里用了矩阵求逆 P=inv(HHT+epsI)
@@ -44,14 +142,20 @@ void compute_lambda_segment(
 static void mat4_mul(const data_t A[4][4], const data_t x[4], data_t y[4]) {
     for (int i = 0; i < 4; ++i) {
         data_t s = 0.0;
-        for (int j = 0; j < 4; ++j) s += A[i][j] * x[j];
+        for (int j = 0; j < 4; ++j) {
+            #pragma HLS UNROLL
+            s += A[i][j] * x[j];
+        }
         y[i] = s;
     }
 }
 
 static data_t vec4_dot(const data_t a[4], const data_t b[4]) {
     data_t s = 0.0;
-    for (int i = 0; i < 4; ++i) s += a[i] * b[i];
+    for (int i = 0; i < 4; ++i) {
+        #pragma HLS UNROLL
+        s += a[i] * b[i];
+    }
     return s;
 }
 
@@ -59,45 +163,67 @@ static void mat4_add_epsI(data_t A[4][4], data_t eps) {
     for (int i = 0; i < 4; ++i) A[i][i] += eps;
 }
 
-// Gauss-Jordan invert 4x4 (return false if singular)
-static bool mat4_inv(const data_t A_in[4][4], data_t Ainv[4][4]) {
-    data_t A[4][8];
+// Adjugate matrix invert 4x4 (return false if singular)
+static bool mat4_inv(const data_t A[4][4], data_t Ainv[4][4]) {
+    #pragma HLS INLINE
+    data_t m00 = A[0][0], m01 = A[0][1], m02 = A[0][2], m03 = A[0][3];
+    data_t m10 = A[1][0], m11 = A[1][1], m12 = A[1][2], m13 = A[1][3];
+    data_t m20 = A[2][0], m21 = A[2][1], m22 = A[2][2], m23 = A[2][3];
+    data_t m30 = A[3][0], m31 = A[3][1], m32 = A[3][2], m33 = A[3][3];
+
+    data_t c00 = m22 * m33 - m23 * m32;
+    data_t c01 = m21 * m33 - m23 * m31;
+    data_t c02 = m21 * m32 - m22 * m31;
+    data_t c03 = m20 * m33 - m23 * m30;
+    data_t c04 = m20 * m32 - m22 * m30;
+    data_t c05 = m20 * m31 - m21 * m30;
+
+    data_t c06 = m12 * m33 - m13 * m32;
+    data_t c07 = m11 * m33 - m13 * m31;
+    data_t c08 = m11 * m32 - m12 * m31;
+    data_t c09 = m10 * m33 - m13 * m30;
+    data_t c10 = m10 * m32 - m12 * m30;
+    data_t c11 = m10 * m31 - m11 * m30;
+
+    data_t c12 = m12 * m23 - m13 * m22;
+    data_t c13 = m11 * m23 - m13 * m21;
+    data_t c14 = m11 * m22 - m12 * m21;
+    data_t c15 = m10 * m23 - m13 * m20;
+    data_t c16 = m10 * m22 - m12 * m20;
+    data_t c17 = m10 * m21 - m11 * m20;
+
+    Ainv[0][0] =  (m11 * c00 - m12 * c01 + m13 * c02);
+    Ainv[0][1] = -(m01 * c00 - m02 * c01 + m03 * c02);
+    Ainv[0][2] =  (m01 * c06 - m02 * c07 + m03 * c08);
+    Ainv[0][3] = -(m01 * c12 - m02 * c13 + m03 * c14);
+
+    Ainv[1][0] = -(m10 * c00 - m12 * c03 + m13 * c04);
+    Ainv[1][1] =  (m00 * c00 - m02 * c03 + m03 * c04);
+    Ainv[1][2] = -(m00 * c06 - m02 * c09 + m03 * c10);
+    Ainv[1][3] =  (m00 * c12 - m02 * c15 + m03 * c16);
+
+    Ainv[2][0] =  (m10 * c01 - m11 * c03 + m13 * c05);
+    Ainv[2][1] = -(m00 * c01 - m01 * c03 + m03 * c05);
+    Ainv[2][2] =  (m00 * c07 - m01 * c09 + m03 * c11);
+    Ainv[2][3] = -(m00 * c13 - m01 * c15 + m03 * c17);
+
+    Ainv[3][0] = -(m10 * c02 - m11 * c04 + m12 * c05);
+    Ainv[3][1] =  (m00 * c02 - m01 * c04 + m02 * c05);
+    Ainv[3][2] = -(m00 * c08 - m01 * c10 + m02 * c11);
+    Ainv[3][3] =  (m00 * c14 - m01 * c16 + m02 * c17);
+
+    data_t det = m00 * Ainv[0][0] + m01 * Ainv[1][0] + m02 * Ainv[2][0] + m03 * Ainv[3][0];
+
+    if (std::fabs(det) < 1e-18) return false;
+
+    data_t invDet = 1.0 / det;
     for (int i = 0; i < 4; ++i) {
-        for (int j = 0; j < 4; ++j) A[i][j] = A_in[i][j];
-        for (int j = 0; j < 4; ++j) A[i][4 + j] = (i == j) ? 1.0 : 0.0;
-    }
-
-    for (int col = 0; col < 4; ++col) {
-        // pivot
-        int piv = col;
-        data_t best = std::fabs(A[col][col]);
-        for (int r = col + 1; r < 4; ++r) {
-            data_t v = std::fabs(A[r][col]);
-            if (v > best) { best = v; piv = r; }
-        }
-        if (best < 1e-18) return false;
-
-        if (piv != col) {
-            for (int j = 0; j < 8; ++j) {
-                data_t tmp = A[col][j];
-                A[col][j] = A[piv][j];
-                A[piv][j] = tmp;
-            }
-        }
-
-        data_t diag = A[col][col];
-        for (int j = 0; j < 8; ++j) A[col][j] /= diag;
-
-        for (int r = 0; r < 4; ++r) {
-            if (r == col) continue;
-            data_t f = A[r][col];
-            for (int j = 0; j < 8; ++j) A[r][j] -= f * A[col][j];
+        #pragma HLS UNROLL
+        for (int j = 0; j < 4; ++j) {
+            #pragma HLS UNROLL
+            Ainv[i][j] *= invDet;
         }
     }
-
-    for (int i = 0; i < 4; ++i)
-        for (int j = 0; j < 4; ++j)
-            Ainv[i][j] = A[i][4 + j];
 
     return true;
 }
@@ -109,20 +235,51 @@ void compute_lambda_p_radius(
     data_t phi
 ) {
     // 1) HHT = H*H^T
-    data_t HHT[4][4] = {0};
+    // data_t HHT[4][4] = {0};
+    // for (int i = 0; i < 4; ++i) {
+    //     #pragma HLS UNROLL
+    //     for (int j = 0; j < 4; ++j) {
+    //         #pragma HLS UNROLL
+    //         data_t s = 0.0;
+    //         for (int k = 0; k < m; ++k) {
+    //             #pragma HLS PIPELINE II=1
+    //             s += H[i][k] * H[j][k];
+    //         }
+    //         HHT[i][j] = s;
+    //     }
+    // }
+    // 1. 初始化
+    data_t HHT[4][4];
     for (int i = 0; i < 4; ++i) {
+        #pragma HLS UNROLL
         for (int j = 0; j < 4; ++j) {
-            data_t s = 0.0;
-            for (int k = 0; k < m; ++k) s += H[i][k] * H[j][k];
-            HHT[i][j] = s;
+            #pragma HLS UNROLL
+            HHT[i][j] = 0.0;
+        }
+    }
+     // 2. 累加计算 (把 k 放到外层)
+    for (int k = 0; k < m; ++k) {
+        // 放宽 II 限制，让工具根据浮点加法延迟自动推导 (通常为 II=4)
+        #pragma HLS PIPELINE 
+        for (int i = 0; i < 4; ++i) {
+            #pragma HLS UNROLL
+            for (int j = 0; j < 4; ++j) {
+                #pragma HLS UNROLL
+                // 16个乘加器并行工作，且循环依赖距离变成跨 k 的迭代
+                HHT[i][j] += H[i][k] * H[j][k];
+            }
         }
     }
 
     // 2) P = inv(HHT + eps I)
     data_t A[4][4];
-    for (int i = 0; i < 4; ++i)
-        for (int j = 0; j < 4; ++j)
+    for (int i = 0; i < 4; ++i) {
+        #pragma HLS UNROLL
+        for (int j = 0; j < 4; ++j) {
+            #pragma HLS UNROLL
             A[i][j] = HHT[i][j];
+        }
+    }
 
     mat4_add_epsI(A, 1e-6);
 
@@ -156,8 +313,12 @@ void compute_lambda_p_radius(
         return;
     }
 
-    for (int i = 0; i < 4; ++i) lambda[i] = num[i] / denom;
+    for (int i = 0; i < 4; ++i) {
+        #pragma HLS UNROLL
+        lambda[i] = num[i] / denom;
+    }
 }
+#endif
 
 
 // ------------------------------
@@ -169,51 +330,58 @@ void compute_lambda_volume(
     const data_t c[N_STATE],
     data_t phi
 ) {
-    // 扫描参数 // Scan parameters
-    const int N_SCAN = 21;
-    const data_t A_MIN = -3.0;
-    const data_t A_MAX =  3.0;
-
-    data_t best_alpha = 0.0;
-    data_t best_cost = 1e300;
+    #pragma HLS ARRAY_PARTITION variable=H complete dim=1
+    #pragma HLS ARRAY_PARTITION variable=c complete dim=1
+    #pragma HLS ARRAY_PARTITION variable=lambda complete dim=1
 
     // 预计算 t = c^T H  (1xm)
+    // ARRAY_PARTITION keeps t[] in registers (not BRAM), enabling II=1 readout
     data_t t[MAX_GEN];
+    #pragma HLS ARRAY_PARTITION variable=t complete dim=1
+    for (int j = 0; j < MAX_GEN; ++j) {
+        #pragma HLS UNROLL
+        t[j] = 0.0f;
+    }
     for (int j = 0; j < m; ++j) {
+        #pragma HLS PIPELINE II=1
+        #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
         data_t s = 0.0;
-        for (int i = 0; i < N_STATE; ++i) s += c[i] * H[i][j];
+        for (int i = 0; i < N_STATE; ++i) {
+            #pragma HLS UNROLL
+            s += c[i] * H[i][j];
+        }
         t[j] = s;
     }
 
-    // 扫描 alpha
-    for (int s = 0; s < N_SCAN; ++s) {
-        data_t alpha = A_MIN + (A_MAX - A_MIN) * (data_t)s / (data_t)(N_SCAN - 1);
-
-        // lam = alpha * c
-        data_t lam[N_STATE];
-        for (int i = 0; i < N_STATE; ++i) lam[i] = alpha * c[i];
-
-        // 构造 H_hat = H - lam * t  (n x m)
-        // 并追加一列 phi*lam
-        data_t cost = 0.0;
-
-        // cost = trace(H_hat H_hat^T) = sum_{i,j} H_hat[i][j]^2  + sum_i (phi*lam[i])^2
-        for (int j = 0; j < m; ++j) {
-            for (int i = 0; i < N_STATE; ++i) {
-                data_t Hij = H[i][j] - lam[i] * t[j];
-                cost += Hij * Hij;
-            }
-        }
-        for (int i = 0; i < N_STATE; ++i) {
-            data_t g = phi * lam[i];
-            cost += g * g;
-        }
-
-        if (cost < best_cost) {
-            best_cost = cost;
-            best_alpha = alpha;
-        }
+    // Interleaved accumulators (ACCUM_LANES=4) break the fadd loop-carried
+    // dependency (latency=4 cycles) so that II=1 is achievable.
+    const int ACCUM_LANES = 4;
+    data_t t_sq_acc[ACCUM_LANES];
+    #pragma HLS ARRAY_PARTITION variable=t_sq_acc complete dim=1
+    for (int l = 0; l < ACCUM_LANES; ++l) {
+        #pragma HLS UNROLL
+        t_sq_acc[l] = 0.0f;
     }
+    for (int j = 0; j < m; ++j) {
+        #pragma HLS PIPELINE II=1
+        #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
+        const int lane = j & (ACCUM_LANES - 1);
+        t_sq_acc[lane] += t[j] * t[j];
+    }
+    data_t t_sq = 0.0f;
+    for (int l = 0; l < ACCUM_LANES; ++l) {
+        #pragma HLS UNROLL
+        t_sq += t_sq_acc[l];
+    }
+
+    data_t c_sq = 0.0;
+    for (int i = 0; i < N_STATE; ++i) {
+        #pragma HLS UNROLL
+        c_sq += c[i] * c[i];
+    }
+
+    data_t denom = c_sq * (t_sq + phi * phi);
+    data_t best_alpha = (denom > 1e-12f) ? (t_sq / denom) : 0.0f;
 
     // 输出最优 lambda
     for (int i = 0; i < N_STATE; ++i) lambda[i] = best_alpha * c[i];
@@ -221,87 +389,216 @@ void compute_lambda_volume(
 
 
 // ------------------------------
-// Reduce: box-preserving (对齐Python)
-// 逻辑：保留 max_gens 个里最“重要”的若干列，其余按行绝对值求和 -> 对角生成器
+// Reduce: box-preserving, in-place on H[N_STATE][MAX_GEN].
 //
-// Python版：
-//   keep = max_gens
-//   drop = m-keep
-//   row_sum = sum(abs(H_drop), axis=1)
-//   H_red = [H_keep, diag(row_sum)]
+// Always reduces to REDUCTION_BUDGET = TOPK + N_STATE generators.
+// Layout after reduce:
+//   H[:,0..TOPK-1]              : top-TOPK kept generators (sorted by norm)
+//   H[:,TOPK..TOPK+N_STATE-1]   : diagonal overapproximation of dropped generators
+//   H[:,TOPK+N_STATE..MAX_GEN-1]: zeros
 //
-// 注意：diag(row_sum) 会新增 n 个生成器，所以最终 m = keep + n
-// 因此这里我们保留 keep_count = max_gens - n 列，把剩余折叠成 diag，最终 m = keep_count + n <= max_gens
+// H_kept[N_STATE][TOPK] replaces the old H_new[N_STATE][MAX_GEN] to stay in
+// LUT-affordable register storage (24×8 = 192 vs 24×64 = 1536 elements).
 // ------------------------------
-void zonotope_reduce(Zonotope* Z, int max_gens) {
-    const int n = Z->n;
-    const int m = Z->m;
-    if (m <= max_gens) return;
+void zonotope_reduce(data_t H[N_STATE][MAX_GEN], int* m_ptr) {
+    static constexpr int REDUCE_STATE_PAR = 8;
+    static constexpr int REDUCE_STATE_BLOCKS = N_STATE / REDUCE_STATE_PAR;
 
-    // 1) 计算每列 L2 范数
+    const int m = *m_ptr;
+    if (m <= REDUCTION_BUDGET) return;
+
+    // 1) Compute L2 column norms with safe scaling:
+    //    norm = scale * sqrt(sum((h_i/scale)^2)).
+    //    This preserves Euclidean-norm ordering without h*h overflow.
     data_t col_norm[MAX_GEN];
+    #pragma HLS ARRAY_PARTITION variable=col_norm complete dim=1
     for (int j = 0; j < m; ++j) {
-        data_t s = 0.0;
-        for (int i = 0; i < n; ++i) s += Z->H[i][j] * Z->H[i][j];
-        col_norm[j] = std::sqrt(s);
-    }
+        #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
+        data_t scale = 0.0f;
+        for (int blk = 0; blk < REDUCE_STATE_BLOCKS; ++blk) {
+            #pragma HLS PIPELINE II=1
+            const int base = blk * REDUCE_STATE_PAR;
+            const data_t a0 = (H[base + 0][j] < 0.0f) ? -H[base + 0][j] : H[base + 0][j];
+            const data_t a1 = (H[base + 1][j] < 0.0f) ? -H[base + 1][j] : H[base + 1][j];
+            const data_t a2 = (H[base + 2][j] < 0.0f) ? -H[base + 2][j] : H[base + 2][j];
+            const data_t a3 = (H[base + 3][j] < 0.0f) ? -H[base + 3][j] : H[base + 3][j];
+            const data_t a4 = (H[base + 4][j] < 0.0f) ? -H[base + 4][j] : H[base + 4][j];
+            const data_t a5 = (H[base + 5][j] < 0.0f) ? -H[base + 5][j] : H[base + 5][j];
+            const data_t a6 = (H[base + 6][j] < 0.0f) ? -H[base + 6][j] : H[base + 6][j];
+            const data_t a7 = (H[base + 7][j] < 0.0f) ? -H[base + 7][j] : H[base + 7][j];
 
-    // 2) 选择 top max_gens 的列索引（简单选择排序，避免 STL）
-    int idx[MAX_GEN];
-    for (int j = 0; j < m; ++j) idx[j] = j;
-
-    // sort idx by col_norm desc (selection sort)
-    for (int a = 0; a < m - 1; ++a) {
-        int best = a;
-        for (int b = a + 1; b < m; ++b) {
-            if (col_norm[idx[b]] > col_norm[idx[best]]) best = b;
+            const data_t m01 = (a0 > a1) ? a0 : a1;
+            const data_t m23 = (a2 > a3) ? a2 : a3;
+            const data_t m45 = (a4 > a5) ? a4 : a5;
+            const data_t m67 = (a6 > a7) ? a6 : a7;
+            const data_t m0123 = (m01 > m23) ? m01 : m23;
+            const data_t m4567 = (m45 > m67) ? m45 : m67;
+            const data_t block_max = (m0123 > m4567) ? m0123 : m4567;
+            scale = (block_max > scale) ? block_max : scale;
         }
-        int tmp = idx[a]; idx[a] = idx[best]; idx[best] = tmp;
-    }
-
-    const int keep = max_gens;                 // 保留的列数 // Number of kept columns
-    const int drop = m - keep;                 // 被聚合的列数 // Number of aggregated columns
-    if (keep < 0) return;                      // 防御（一般不会发生） // Guard (normally should not happen)
-    if (keep > MAX_GEN) return;                // 防御 // Guard
-
-    // 3) 拷贝保留列 // 3) Copy kept columns
-    data_t H_new[N_STATE][MAX_GEN] = {0.0};
-    for (int j = 0; j < keep; ++j) {
-        int old_j = idx[j];
-        for (int i = 0; i < n; ++i) H_new[i][j] = Z->H[i][old_j];
-    }
-
-    // 4) row-sum(abs) 聚合剩余列，形成 diag(row_sum)
-    // 2. 将剩余生成器合并为对角阵：d[i] = sum_j abs(H_drop[i][j])
-    data_t H_drop[N_STATE][MAX_GEN] = {0.0};
-    int m_drop = 0;
-
-    for (int k = keep; k < Z->m; ++k) {
-        int old_idx = idx[k];
-        for (int i = 0; i < Z->n; ++i) {
-            H_drop[i][m_drop] = Z->H[i][old_idx];
+        if (scale < 1e-20f) {
+            col_norm[j] = 0.0f;
+            continue;
         }
-        m_drop++;
+
+        const data_t inv_scale = 1.0f / scale;
+        data_t sum_sq_blk[REDUCE_STATE_BLOCKS];
+        #pragma HLS ARRAY_PARTITION variable=sum_sq_blk complete dim=1
+        for (int blk = 0; blk < REDUCE_STATE_BLOCKS; ++blk) {
+            #pragma HLS PIPELINE II=1
+            const int base = blk * REDUCE_STATE_PAR;
+            const data_t v0 = H[base + 0][j] * inv_scale;
+            const data_t v1 = H[base + 1][j] * inv_scale;
+            const data_t v2 = H[base + 2][j] * inv_scale;
+            const data_t v3 = H[base + 3][j] * inv_scale;
+            const data_t v4 = H[base + 4][j] * inv_scale;
+            const data_t v5 = H[base + 5][j] * inv_scale;
+            const data_t v6 = H[base + 6][j] * inv_scale;
+            const data_t v7 = H[base + 7][j] * inv_scale;
+
+            const data_t s01 = v0 * v0 + v1 * v1;
+            const data_t s23 = v2 * v2 + v3 * v3;
+            const data_t s45 = v4 * v4 + v5 * v5;
+            const data_t s67 = v6 * v6 + v7 * v7;
+            const data_t s0123 = s01 + s23;
+            const data_t s4567 = s45 + s67;
+            sum_sq_blk[blk] = s0123 + s4567;
+        }
+        const data_t sum_sq = sum_sq_blk[0] + sum_sq_blk[1] + sum_sq_blk[2];
+        col_norm[j] = scale * std::sqrt(sum_sq);
     }
 
-    data_t d[N_STATE] = {0.0};
-    row_sum_abs_kernel(H_drop, m_drop, d);
+    // 2) Single-pass top-TOPK selection.
+    //    We only keep TOPK candidates. Guard slots (inf) are unnecessary because
+    //    min selection never needs to consider indices outside [0..TOPK-1].
+    data_t top_vals[TOPK];
+    int    top_idx[TOPK];
+    #pragma HLS ARRAY_PARTITION variable=top_vals complete dim=1
+    #pragma HLS ARRAY_PARTITION variable=top_idx  complete dim=1
 
-
-    // 追加对角阵：占用 n 列
-    // 结果列数 = keep + n
-    for (int i = 0; i < n; ++i) {
-        H_new[i][keep + i] = d[i];
+    for (int k = 0; k < TOPK; ++k) {
+        #pragma HLS UNROLL
+        top_vals[k] = col_norm[k];
+        top_idx[k]  = k;
     }
 
-    const int m_new = keep + n;
-    Z->m = m_new;
-
-    // 5) 写回并清零剩余 // 5) Write back and zero remaining columns
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < m_new; ++j) Z->H[i][j] = H_new[i][j];
-        for (int j = m_new; j < MAX_GEN; ++j) Z->H[i][j] = 0.0;
+    // Auto-pipelining this loop was landing at II=8 because the compare/update
+    // chain carries state across iterations. TOPK is only 8, so keeping this
+    // loop sequential is a better tradeoff while we reduce LUT pressure.
+    for (int j = TOPK; j < m; ++j) {
+        #pragma HLS PIPELINE off
+        #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
+        const data_t v = col_norm[j];
+        int min_k = 0;
+        data_t min_v = top_vals[0];
+        for (int k = 1; k < TOPK; ++k) {
+            #pragma HLS UNROLL
+            if (top_vals[k] < min_v) {
+                min_v = top_vals[k];
+                min_k = k;
+            }
+        }
+        if (v > min_v) {
+            top_vals[min_k] = v;
+            top_idx[min_k] = j;
+        }
     }
+
+    // 3) Save top-TOPK columns into compact H_kept[N_STATE][TOPK].
+    //    TOPK = 8 → only 192 registers vs 1536 for H_new[N_STATE][MAX_GEN].
+    data_t H_kept[N_STATE][TOPK];
+    #pragma HLS ARRAY_PARTITION variable=H_kept complete dim=1
+    #pragma HLS ARRAY_PARTITION variable=H_kept complete dim=2
+
+    for (int k = 0; k < TOPK; ++k) {
+        #pragma HLS UNROLL
+        const int old_j = top_idx[k];
+        for (int i = 0; i < N_STATE; ++i) {
+            #pragma HLS UNROLL
+            H_kept[i][k] = H[i][old_j];
+        }
+    }
+
+    // 4) Build kept_flag and row-sum dropped columns.
+    bool kept_flag[MAX_GEN];
+    #pragma HLS ARRAY_PARTITION variable=kept_flag complete dim=1
+    for (int j = 0; j < MAX_GEN; ++j) {
+        #pragma HLS UNROLL
+        kept_flag[j] = false;
+    }
+    for (int k = 0; k < TOPK; ++k) {
+        #pragma HLS UNROLL
+        kept_flag[top_idx[k]] = true;
+    }
+
+    const int ACCUM_LANES = 4;
+    data_t d_acc[ACCUM_LANES][N_STATE];
+    #pragma HLS ARRAY_PARTITION variable=d_acc complete dim=1
+    #pragma HLS ARRAY_PARTITION variable=d_acc complete dim=2
+    for (int l = 0; l < ACCUM_LANES; ++l) {
+        #pragma HLS UNROLL
+        for (int i = 0; i < N_STATE; ++i) {
+            #pragma HLS UNROLL
+            d_acc[l][i] = 0.0f;
+        }
+    }
+    for (int j = 0; j < m; ++j) {
+        #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
+        const int lane = j & (ACCUM_LANES - 1);
+        const data_t w = kept_flag[j] ? 0.0f : 1.0f;
+        for (int blk = 0; blk < REDUCE_STATE_BLOCKS; ++blk) {
+            #pragma HLS PIPELINE II=1
+            const int base = blk * REDUCE_STATE_PAR;
+            for (int i = 0; i < REDUCE_STATE_PAR; ++i) {
+                #pragma HLS UNROLL
+                const data_t v = H[base + i][j];
+                d_acc[lane][base + i] += w * (v < 0.0f ? -v : v);
+            }
+        }
+    }
+    data_t d[N_STATE];
+    #pragma HLS ARRAY_PARTITION variable=d complete dim=1
+    for (int i = 0; i < N_STATE; ++i) {
+        #pragma HLS UNROLL
+        data_t s = 0.0f;
+        for (int l = 0; l < ACCUM_LANES; ++l) {
+            #pragma HLS UNROLL
+            s += d_acc[l][i];
+        }
+        d[i] = s;
+    }
+
+    // 5) Write result directly into H (no H_new copy needed):
+    //    Columns 0..TOPK-1         : H_kept (kept generators) — static addressing
+    //    Columns TOPK..TOPK+N_STATE-1 : diagonal d[] — static addressing (TOPK is const)
+    //    Columns TOPK+N_STATE..MAX_GEN-1 : zeros — static addressing
+    for (int k = 0; k < TOPK; ++k) {
+        #pragma HLS UNROLL
+        for (int i = 0; i < N_STATE; ++i) {
+            #pragma HLS UNROLL
+            H[i][k] = H_kept[i][k];
+        }
+    }
+    for (int j = TOPK; j < REDUCTION_BUDGET; ++j) {
+        #pragma HLS UNROLL
+        for (int i = 0; i < N_STATE; ++i) {
+            #pragma HLS UNROLL
+            H[i][j] = 0.0f;
+        }
+    }
+    for (int i = 0; i < N_STATE; ++i) {
+        #pragma HLS UNROLL
+        H[i][TOPK + i] = d[i];           // TOPK is compile-time → static column address
+    }
+    for (int j = REDUCTION_BUDGET; j < MAX_GEN; ++j) {
+        #pragma HLS UNROLL
+        for (int i = 0; i < N_STATE; ++i) {
+            #pragma HLS UNROLL
+            H[i][j] = 0.0f;
+        }
+    }
+
+    *m_ptr = REDUCTION_BUDGET;            // = TOPK + N_STATE, compile-time constant
 }
 
 

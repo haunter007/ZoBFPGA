@@ -1,16 +1,18 @@
 #ifndef ZONOTOPE_H
 #define ZONOTOPE_H
 
-#define N_STATE               4     // 状态维度 // State dimension
-#define MAX_GEN               32    // 最大生成器数量 // Maximum number of generators
+#define N_STATE               24    // 状态维度 // State dimension (6 coupled oscillator blocks × 4)
+#define MAX_GEN               64    // 最大生成器数量 // Maximum generators (≥ REDUCTION_BUDGET+N_STATE)
 #define N_INPUT               1     // 输入维度 // Input dimension
-#define N_MEAS                2     // 测量维度 // Measurement dimension
-#define NUM_STEPS             15    // 仿真步数 // Number of simulation steps
+#define N_MEAS                12    // 测量维度 // Measurement dimension (2 per 4x4 block)
+#define NUM_STEPS             200   // 仿真步数 // Number of simulation steps
+#define N_BATCH               NUM_STEPS  // Steps per single FPGA kernel call (batch mode)
 #define DT                    0.1   // 采样时间 // Sampling time
 #define PROC_NOISE_RADIUS     0.05  // 过程噪声半径 // Process noise radius
 #define MEAS_NOISE_RADIUS     0.1   // 测量噪声半径 0.1 // Measurement noise radius 0.1
 #define INIT_RADIUS           0.2   // 初始状态半径 // Initial state radius
-#define REDUCTION_BUDGET      8     // 降阶预算 // Reduction budget
+#define REDUCTION_BUDGET      32    // 降阶预算 (≥N_STATE, ≤MAX_GEN-N_MEAS) // Reduction budget
+#define TOPK                  (REDUCTION_BUDGET - N_STATE)  // Generators kept by top-K (= 8)
 #define RANDOM_SEED          42     // 随机种子[1](@ref)
 // #include <ap_fixed.h>
 // using data_t = ap_fixed<32, 8>;  // 例子：总32位，整数8位（含符号）
@@ -52,9 +54,8 @@ void compute_lambda_p_radius(
     data_t phi   
 );
 
-void zonotope_reduce(
-    Zonotope* Z,  
-    int max_gens   
-);
+// Reduce H in-place to REDUCTION_BUDGET generators (uses TOPK+N_STATE layout).
+// Always reduces to REDUCTION_BUDGET columns; *m is set to REDUCTION_BUDGET.
+void zonotope_reduce(data_t H[N_STATE][MAX_GEN], int* m);
 
 #endif
