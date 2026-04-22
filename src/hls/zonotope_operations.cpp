@@ -11,6 +11,7 @@ void compute_lambda_segment(
     int c_idx,
     data_t phi
 ) {
+    #pragma HLS INLINE
     #pragma HLS ARRAY_PARTITION variable=H complete dim=1
     #pragma HLS ARRAY_PARTITION variable=lambda complete dim=1
 
@@ -331,24 +332,70 @@ static void reduce_compute_l1_col_norms(
     #pragma HLS ARRAY_PARTITION variable=H complete dim=1
     #pragma HLS ARRAY_PARTITION variable=col_norm complete dim=1
 
-    for (int j = 0; j < m; ++j) {
-        #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
-        data_t sum_abs_blk[3];
-        #pragma HLS ARRAY_PARTITION variable=sum_abs_blk complete dim=1
-        for (int blk = 0; blk < 3; ++blk) {
-            #pragma HLS PIPELINE II=1
-            const int base = blk * 8;
-            const data_t a0 = (H[base + 0][j] < 0.0f) ? -H[base + 0][j] : H[base + 0][j];
-            const data_t a1 = (H[base + 1][j] < 0.0f) ? -H[base + 1][j] : H[base + 1][j];
-            const data_t a2 = (H[base + 2][j] < 0.0f) ? -H[base + 2][j] : H[base + 2][j];
-            const data_t a3 = (H[base + 3][j] < 0.0f) ? -H[base + 3][j] : H[base + 3][j];
-            const data_t a4 = (H[base + 4][j] < 0.0f) ? -H[base + 4][j] : H[base + 4][j];
-            const data_t a5 = (H[base + 5][j] < 0.0f) ? -H[base + 5][j] : H[base + 5][j];
-            const data_t a6 = (H[base + 6][j] < 0.0f) ? -H[base + 6][j] : H[base + 6][j];
-            const data_t a7 = (H[base + 7][j] < 0.0f) ? -H[base + 7][j] : H[base + 7][j];
-            sum_abs_blk[blk] = a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7;
+    for (int j = 0; j < m; j += 2) {
+        #pragma HLS LOOP_TRIPCOUNT min=0 max=32
+        #pragma HLS PIPELINE II=1
+        const bool has_j1 = (j + 1) < m;
+
+        const data_t j0_0  = (H[0][j]  < 0.0f) ? -H[0][j]  : H[0][j];
+        const data_t j0_1  = (H[1][j]  < 0.0f) ? -H[1][j]  : H[1][j];
+        const data_t j0_2  = (H[2][j]  < 0.0f) ? -H[2][j]  : H[2][j];
+        const data_t j0_3  = (H[3][j]  < 0.0f) ? -H[3][j]  : H[3][j];
+        const data_t j0_4  = (H[4][j]  < 0.0f) ? -H[4][j]  : H[4][j];
+        const data_t j0_5  = (H[5][j]  < 0.0f) ? -H[5][j]  : H[5][j];
+        const data_t j0_6  = (H[6][j]  < 0.0f) ? -H[6][j]  : H[6][j];
+        const data_t j0_7  = (H[7][j]  < 0.0f) ? -H[7][j]  : H[7][j];
+        const data_t j0_8  = (H[8][j]  < 0.0f) ? -H[8][j]  : H[8][j];
+        const data_t j0_9  = (H[9][j]  < 0.0f) ? -H[9][j]  : H[9][j];
+        const data_t j0_10 = (H[10][j] < 0.0f) ? -H[10][j] : H[10][j];
+        const data_t j0_11 = (H[11][j] < 0.0f) ? -H[11][j] : H[11][j];
+        const data_t j0_12 = (H[12][j] < 0.0f) ? -H[12][j] : H[12][j];
+        const data_t j0_13 = (H[13][j] < 0.0f) ? -H[13][j] : H[13][j];
+        const data_t j0_14 = (H[14][j] < 0.0f) ? -H[14][j] : H[14][j];
+        const data_t j0_15 = (H[15][j] < 0.0f) ? -H[15][j] : H[15][j];
+        const data_t j0_16 = (H[16][j] < 0.0f) ? -H[16][j] : H[16][j];
+        const data_t j0_17 = (H[17][j] < 0.0f) ? -H[17][j] : H[17][j];
+        const data_t j0_18 = (H[18][j] < 0.0f) ? -H[18][j] : H[18][j];
+        const data_t j0_19 = (H[19][j] < 0.0f) ? -H[19][j] : H[19][j];
+        const data_t j0_20 = (H[20][j] < 0.0f) ? -H[20][j] : H[20][j];
+        const data_t j0_21 = (H[21][j] < 0.0f) ? -H[21][j] : H[21][j];
+        const data_t j0_22 = (H[22][j] < 0.0f) ? -H[22][j] : H[22][j];
+        const data_t j0_23 = (H[23][j] < 0.0f) ? -H[23][j] : H[23][j];
+        col_norm[j] =
+            j0_0 + j0_1 + j0_2 + j0_3 + j0_4 + j0_5 + j0_6 + j0_7 +
+            j0_8 + j0_9 + j0_10 + j0_11 + j0_12 + j0_13 + j0_14 + j0_15 +
+            j0_16 + j0_17 + j0_18 + j0_19 + j0_20 + j0_21 + j0_22 + j0_23;
+
+        if (has_j1) {
+            const data_t j1_0  = (H[0][j + 1]  < 0.0f) ? -H[0][j + 1]  : H[0][j + 1];
+            const data_t j1_1  = (H[1][j + 1]  < 0.0f) ? -H[1][j + 1]  : H[1][j + 1];
+            const data_t j1_2  = (H[2][j + 1]  < 0.0f) ? -H[2][j + 1]  : H[2][j + 1];
+            const data_t j1_3  = (H[3][j + 1]  < 0.0f) ? -H[3][j + 1]  : H[3][j + 1];
+            const data_t j1_4  = (H[4][j + 1]  < 0.0f) ? -H[4][j + 1]  : H[4][j + 1];
+            const data_t j1_5  = (H[5][j + 1]  < 0.0f) ? -H[5][j + 1]  : H[5][j + 1];
+            const data_t j1_6  = (H[6][j + 1]  < 0.0f) ? -H[6][j + 1]  : H[6][j + 1];
+            const data_t j1_7  = (H[7][j + 1]  < 0.0f) ? -H[7][j + 1]  : H[7][j + 1];
+            const data_t j1_8  = (H[8][j + 1]  < 0.0f) ? -H[8][j + 1]  : H[8][j + 1];
+            const data_t j1_9  = (H[9][j + 1]  < 0.0f) ? -H[9][j + 1]  : H[9][j + 1];
+            const data_t j1_10 = (H[10][j + 1] < 0.0f) ? -H[10][j + 1] : H[10][j + 1];
+            const data_t j1_11 = (H[11][j + 1] < 0.0f) ? -H[11][j + 1] : H[11][j + 1];
+            const data_t j1_12 = (H[12][j + 1] < 0.0f) ? -H[12][j + 1] : H[12][j + 1];
+            const data_t j1_13 = (H[13][j + 1] < 0.0f) ? -H[13][j + 1] : H[13][j + 1];
+            const data_t j1_14 = (H[14][j + 1] < 0.0f) ? -H[14][j + 1] : H[14][j + 1];
+            const data_t j1_15 = (H[15][j + 1] < 0.0f) ? -H[15][j + 1] : H[15][j + 1];
+            const data_t j1_16 = (H[16][j + 1] < 0.0f) ? -H[16][j + 1] : H[16][j + 1];
+            const data_t j1_17 = (H[17][j + 1] < 0.0f) ? -H[17][j + 1] : H[17][j + 1];
+            const data_t j1_18 = (H[18][j + 1] < 0.0f) ? -H[18][j + 1] : H[18][j + 1];
+            const data_t j1_19 = (H[19][j + 1] < 0.0f) ? -H[19][j + 1] : H[19][j + 1];
+            const data_t j1_20 = (H[20][j + 1] < 0.0f) ? -H[20][j + 1] : H[20][j + 1];
+            const data_t j1_21 = (H[21][j + 1] < 0.0f) ? -H[21][j + 1] : H[21][j + 1];
+            const data_t j1_22 = (H[22][j + 1] < 0.0f) ? -H[22][j + 1] : H[22][j + 1];
+            const data_t j1_23 = (H[23][j + 1] < 0.0f) ? -H[23][j + 1] : H[23][j + 1];
+            col_norm[j + 1] =
+                j1_0 + j1_1 + j1_2 + j1_3 + j1_4 + j1_5 + j1_6 + j1_7 +
+                j1_8 + j1_9 + j1_10 + j1_11 + j1_12 + j1_13 + j1_14 + j1_15 +
+                j1_16 + j1_17 + j1_18 + j1_19 + j1_20 + j1_21 + j1_22 + j1_23;
         }
-        col_norm[j] = sum_abs_blk[0] + sum_abs_blk[1] + sum_abs_blk[2];
     }
 }
 
@@ -374,15 +421,29 @@ static void reduce_select_topk(
         #pragma HLS PIPELINE off
         #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
         const data_t v = col_norm[j];
-        int min_k = 0;
-        data_t min_v = top_vals[0];
-        for (int k = 1; k < TOPK; ++k) {
-            #pragma HLS UNROLL
-            if (top_vals[k] < min_v) {
-                min_v = top_vals[k];
-                min_k = k;
-            }
-        }
+        const bool c01 = top_vals[0] < top_vals[1];
+        const data_t m01_v = c01 ? top_vals[0] : top_vals[1];
+        const int m01_k = c01 ? 0 : 1;
+        const bool c23 = top_vals[2] < top_vals[3];
+        const data_t m23_v = c23 ? top_vals[2] : top_vals[3];
+        const int m23_k = c23 ? 2 : 3;
+        const bool c45 = top_vals[4] < top_vals[5];
+        const data_t m45_v = c45 ? top_vals[4] : top_vals[5];
+        const int m45_k = c45 ? 4 : 5;
+        const bool c67 = top_vals[6] < top_vals[7];
+        const data_t m67_v = c67 ? top_vals[6] : top_vals[7];
+        const int m67_k = c67 ? 6 : 7;
+
+        const bool c03 = m01_v < m23_v;
+        const data_t m03_v = c03 ? m01_v : m23_v;
+        const int m03_k = c03 ? m01_k : m23_k;
+        const bool c47 = m45_v < m67_v;
+        const data_t m47_v = c47 ? m45_v : m67_v;
+        const int m47_k = c47 ? m45_k : m67_k;
+
+        const bool c07 = m03_v < m47_v;
+        const data_t min_v = c07 ? m03_v : m47_v;
+        const int min_k = c07 ? m03_k : m47_k;
         if (v > min_v) {
             top_vals[min_k] = v;
             top_idx[min_k] = j;

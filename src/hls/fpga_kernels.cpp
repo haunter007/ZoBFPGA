@@ -193,6 +193,7 @@ void zonotope_step_kernel(
     const data_t phi[N_MEAS],
     int max_gens
 ) {
+#pragma HLS INLINE
 #pragma HLS ARRAY_PARTITION variable=p_inout complete dim=1
 #pragma HLS ARRAY_PARTITION variable=H_inout cyclic factor=STATE_PAR dim=1
 #pragma HLS ARRAY_PARTITION variable=A       complete dim=2
@@ -300,25 +301,13 @@ void zonotope_step_kernel(
     // 3. Strip updates — fully IN-PLACE on p_inout / H_inout
     for (int meas = 0; meas < N_MEAS; ++meas) {
         const int meas_state = meas_state_index(meas);
-        data_t lambda[N_STATE];
-#pragma HLS ARRAY_PARTITION variable=lambda complete dim=1
-        for (int i = 0; i < N_STATE; ++i) {
-#pragma HLS UNROLL
-            lambda[i] = 0.0f;
-        }
-
-        compute_lambda_segment(lambda, H_inout, m, meas_state, phi[meas]);
-
-        // For the current model, each measurement row is a one-hot selector
-        // of the first two states in its 4x4 oscillator block.
+        const data_t phi_meas = phi[meas];
         const data_t residual = p_inout[meas_state];
         const data_t r = y[meas] - residual;
+        data_t lambda[N_STATE];
+#pragma HLS ARRAY_PARTITION variable=lambda complete dim=1
 
-        // p += lambda * r  (in-place)
-        for (int i = 0; i < N_STATE; ++i) {
-#pragma HLS UNROLL factor=STATE_PAR
-            p_inout[i] += lambda[i] * r;
-        }
+        compute_lambda_segment(lambda, H_inout, m, meas_state, phi_meas);
 
         // Update H a bank-aligned block at a time. Keep only half a bank
         // active per cycle here; the recovered fast lambda path already
@@ -355,11 +344,56 @@ void zonotope_step_kernel(
             H_inout[23][j] -= lambda[23] * t;
         }
 
-        // Append phi*lambda as new generator
-        for (int i = 0; i < N_STATE; ++i) {
-#pragma HLS UNROLL factor=STATE_PAR
-            H_inout[i][m] = phi[meas] * lambda[i];
-        }
+        // Fuse the p update and generator append so each 8-lane sweep over
+        // state executes once per measurement instead of twice.
+        const data_t lambda_0 = lambda[0];
+        const data_t lambda_1 = lambda[1];
+        const data_t lambda_2 = lambda[2];
+        const data_t lambda_3 = lambda[3];
+        const data_t lambda_4 = lambda[4];
+        const data_t lambda_5 = lambda[5];
+        const data_t lambda_6 = lambda[6];
+        const data_t lambda_7 = lambda[7];
+        p_inout[0] += lambda_0 * r;  H_inout[0][m] = phi_meas * lambda_0;
+        p_inout[1] += lambda_1 * r;  H_inout[1][m] = phi_meas * lambda_1;
+        p_inout[2] += lambda_2 * r;  H_inout[2][m] = phi_meas * lambda_2;
+        p_inout[3] += lambda_3 * r;  H_inout[3][m] = phi_meas * lambda_3;
+        p_inout[4] += lambda_4 * r;  H_inout[4][m] = phi_meas * lambda_4;
+        p_inout[5] += lambda_5 * r;  H_inout[5][m] = phi_meas * lambda_5;
+        p_inout[6] += lambda_6 * r;  H_inout[6][m] = phi_meas * lambda_6;
+        p_inout[7] += lambda_7 * r;  H_inout[7][m] = phi_meas * lambda_7;
+        const data_t lambda_8 = lambda[8];
+        const data_t lambda_9 = lambda[9];
+        const data_t lambda_10 = lambda[10];
+        const data_t lambda_11 = lambda[11];
+        const data_t lambda_12 = lambda[12];
+        const data_t lambda_13 = lambda[13];
+        const data_t lambda_14 = lambda[14];
+        const data_t lambda_15 = lambda[15];
+        p_inout[8] += lambda_8 * r;    H_inout[8][m] = phi_meas * lambda_8;
+        p_inout[9] += lambda_9 * r;    H_inout[9][m] = phi_meas * lambda_9;
+        p_inout[10] += lambda_10 * r;  H_inout[10][m] = phi_meas * lambda_10;
+        p_inout[11] += lambda_11 * r;  H_inout[11][m] = phi_meas * lambda_11;
+        p_inout[12] += lambda_12 * r;  H_inout[12][m] = phi_meas * lambda_12;
+        p_inout[13] += lambda_13 * r;  H_inout[13][m] = phi_meas * lambda_13;
+        p_inout[14] += lambda_14 * r;  H_inout[14][m] = phi_meas * lambda_14;
+        p_inout[15] += lambda_15 * r;  H_inout[15][m] = phi_meas * lambda_15;
+        const data_t lambda_16 = lambda[16];
+        const data_t lambda_17 = lambda[17];
+        const data_t lambda_18 = lambda[18];
+        const data_t lambda_19 = lambda[19];
+        const data_t lambda_20 = lambda[20];
+        const data_t lambda_21 = lambda[21];
+        const data_t lambda_22 = lambda[22];
+        const data_t lambda_23 = lambda[23];
+        p_inout[16] += lambda_16 * r;  H_inout[16][m] = phi_meas * lambda_16;
+        p_inout[17] += lambda_17 * r;  H_inout[17][m] = phi_meas * lambda_17;
+        p_inout[18] += lambda_18 * r;  H_inout[18][m] = phi_meas * lambda_18;
+        p_inout[19] += lambda_19 * r;  H_inout[19][m] = phi_meas * lambda_19;
+        p_inout[20] += lambda_20 * r;  H_inout[20][m] = phi_meas * lambda_20;
+        p_inout[21] += lambda_21 * r;  H_inout[21][m] = phi_meas * lambda_21;
+        p_inout[22] += lambda_22 * r;  H_inout[22][m] = phi_meas * lambda_22;
+        p_inout[23] += lambda_23 * r;  H_inout[23][m] = phi_meas * lambda_23;
         m += 1;
     }
 
