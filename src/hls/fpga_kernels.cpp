@@ -602,7 +602,7 @@ void zonotope_batch_kernel_axi(
 
     // ---- 1. Load current zonotope state ----
     for (int i = 0; i < N_STATE; ++i) {
-#pragma HLS PIPELINE II=1
+#pragma HLS UNROLL
         p_local[i] = p_inout[i];
     }
     for (int r = 0; r < N_STATE; ++r) {
@@ -665,11 +665,10 @@ void zonotope_batch_kernel_axi(
     // ---- 4. Write back updated zonotope state ----
     *m_inout = m_local;
     for (int i = 0; i < N_STATE; ++i) {
-#pragma HLS PIPELINE II=1
+#pragma HLS UNROLL
         p_inout[i] = p_local[i];
     }
     for (int r = 0; r < N_STATE; ++r) {
-#pragma HLS UNROLL
         for (int c = 0; c < MAX_GEN; ++c) {
 #pragma HLS PIPELINE II=1
             H_inout[r * MAX_GEN + c] = H_local[r][c];
