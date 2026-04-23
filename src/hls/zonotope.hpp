@@ -13,6 +13,8 @@
 #define INIT_RADIUS           0.2   // 初始状态半径 // Initial state radius
 #define REDUCTION_BUDGET      32    // 降阶预算 (≥N_STATE, ≤MAX_GEN-N_MEAS) // Reduction budget
 #define TOPK                  (REDUCTION_BUDGET - N_STATE)  // Generators kept by top-K (= 8)
+#define STEP_MEAS_MAX_GEN     (REDUCTION_BUDGET + N_MEAS)
+#define REDUCE_INPUT_MAX_GEN  (REDUCTION_BUDGET + N_STATE)
 #define RANDOM_SEED          42     // 随机种子[1](@ref)
 // #include <ap_fixed.h>
 // using data_t = ap_fixed<32, 8>;  // 例子：总32位，整数8位（含符号）

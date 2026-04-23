@@ -15,14 +15,22 @@ void compute_lambda_segment(
     #pragma HLS ARRAY_PARTITION variable=H complete dim=1
     #pragma HLS ARRAY_PARTITION variable=lambda complete dim=1
 
+    static constexpr int OSC_BLOCK_SIZE = 4;
     const int ACCUM_LANES = 4;
-    data_t HHT_c_acc[ACCUM_LANES][N_STATE];
+    data_t HHT_c_acc[ACCUM_LANES][OSC_BLOCK_SIZE];
     #pragma HLS ARRAY_PARTITION variable=HHT_c_acc complete dim=1
     #pragma HLS ARRAY_PARTITION variable=HHT_c_acc complete dim=2
+    const int block_base = (c_idx / OSC_BLOCK_SIZE) * OSC_BLOCK_SIZE;
+    const int c_local = c_idx - block_base;
+
+    for (int i = 0; i < N_STATE; ++i) {
+        #pragma HLS UNROLL
+        lambda[i] = 0.0f;
+    }
 
     for (int l = 0; l < ACCUM_LANES; ++l) {
         #pragma HLS UNROLL
-        for (int i = 0; i < N_STATE; ++i) {
+        for (int i = 0; i < OSC_BLOCK_SIZE; ++i) {
             #pragma HLS UNROLL
             HHT_c_acc[l][i] = 0.0f;
         }
@@ -30,18 +38,18 @@ void compute_lambda_segment(
 
     for (int j = 0; j < m; ++j) {
         #pragma HLS PIPELINE II=1
-        #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
+        #pragma HLS LOOP_TRIPCOUNT min=0 max=STEP_MEAS_MAX_GEN
         const int lane = j & (ACCUM_LANES - 1);
         const data_t h_dot_c = H[c_idx][j];
-        for (int i = 0; i < N_STATE; ++i) {
+        for (int i = 0; i < OSC_BLOCK_SIZE; ++i) {
             #pragma HLS UNROLL
-            HHT_c_acc[lane][i] += H[i][j] * h_dot_c;
+            HHT_c_acc[lane][i] += H[block_base + i][j] * h_dot_c;
         }
     }
 
-    data_t HHT_c[N_STATE];
+    data_t HHT_c[OSC_BLOCK_SIZE];
     #pragma HLS ARRAY_PARTITION variable=HHT_c complete dim=1
-    for (int i = 0; i < N_STATE; ++i) {
+    for (int i = 0; i < OSC_BLOCK_SIZE; ++i) {
         #pragma HLS UNROLL
         data_t sum = 0.0f;
         for (int l = 0; l < ACCUM_LANES; ++l) {
@@ -51,19 +59,15 @@ void compute_lambda_segment(
         HHT_c[i] = sum;
     }
 
-    const data_t denom = phi * phi + HHT_c[c_idx];
+    const data_t denom = phi * phi + HHT_c[c_local];
     if (std::fabs(denom) < 1e-12f) {
-        for (int i = 0; i < N_STATE; ++i) {
-            #pragma HLS UNROLL
-            lambda[i] = 0.0f;
-        }
         return;
     }
 
     const data_t inv_denom = 1.0f / denom;
-    for (int i = 0; i < N_STATE; ++i) {
+    for (int i = 0; i < OSC_BLOCK_SIZE; ++i) {
         #pragma HLS UNROLL
-        lambda[i] = HHT_c[i] * inv_denom;
+        lambda[block_base + i] = HHT_c[i] * inv_denom;
     }
 }
 
@@ -419,7 +423,7 @@ static void reduce_select_topk(
 
     for (int j = TOPK; j < m; ++j) {
         #pragma HLS PIPELINE off
-        #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
+        #pragma HLS LOOP_TRIPCOUNT min=0 max=REDUCE_INPUT_MAX_GEN
         const data_t v = col_norm[j];
         const bool c01 = top_vals[0] < top_vals[1];
         const data_t m01_v = c01 ? top_vals[0] : top_vals[1];
@@ -462,7 +466,7 @@ static void reduce_accumulate_diag(
     #pragma HLS ARRAY_PARTITION variable=top_idx complete dim=1
     #pragma HLS ARRAY_PARTITION variable=d complete dim=1
 
-    static constexpr int REDUCE_STATE_PAR = 8;
+    static constexpr int REDUCE_STATE_PAR = N_STATE;
     static constexpr int REDUCE_STATE_BLOCKS = N_STATE / REDUCE_STATE_PAR;
     const int ACCUM_LANES = 4;
 
@@ -489,7 +493,7 @@ static void reduce_accumulate_diag(
     }
 
     for (int j = 0; j < m; ++j) {
-        #pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
+        #pragma HLS LOOP_TRIPCOUNT min=0 max=REDUCE_INPUT_MAX_GEN
         const int lane = j & (ACCUM_LANES - 1);
         if (!kept_flag[j]) {
             for (int blk = 0; blk < REDUCE_STATE_BLOCKS; ++blk) {

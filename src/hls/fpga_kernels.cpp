@@ -5,7 +5,7 @@
 
 extern "C" {
 
-static constexpr int STATE_PAR = 8;
+static constexpr int STATE_PAR = N_STATE;
 static constexpr int STATE_BLOCKS = N_STATE / STATE_PAR;
 static constexpr int OSC_BLOCK_SIZE = 4;
 static constexpr int OSC_BLOCKS = N_STATE / OSC_BLOCK_SIZE;
@@ -14,6 +14,103 @@ static inline int meas_state_index(int meas) {
 #pragma HLS INLINE
     return (meas / 2) * OSC_BLOCK_SIZE + (meas % 2);
 }
+
+#define DEFINE_MEAS_UPDATE_FUNC(NAME, BASE, CIDX) \
+static inline void NAME( \
+    data_t p_inout[N_STATE], \
+    data_t H_inout[N_STATE][MAX_GEN], \
+    int* m_inout, \
+    data_t y_val, \
+    data_t phi_meas \
+) { \
+    _Pragma("HLS INLINE") \
+    _Pragma("HLS ARRAY_PARTITION variable=p_inout complete dim=1") \
+    _Pragma("HLS ARRAY_PARTITION variable=H_inout complete dim=1") \
+    const int m = *m_inout; \
+    assert(m <= STEP_MEAS_MAX_GEN); \
+    const data_t residual = p_inout[CIDX]; \
+    const data_t r = y_val - residual; \
+    const int ACCUM_LANES = 4; \
+    data_t acc[ACCUM_LANES][OSC_BLOCK_SIZE]; \
+    _Pragma("HLS ARRAY_PARTITION variable=acc complete dim=1") \
+    _Pragma("HLS ARRAY_PARTITION variable=acc complete dim=2") \
+    for (int l = 0; l < ACCUM_LANES; ++l) { \
+        _Pragma("HLS UNROLL") \
+        for (int i = 0; i < OSC_BLOCK_SIZE; ++i) { \
+            _Pragma("HLS UNROLL") \
+            acc[l][i] = 0.0f; \
+        } \
+    } \
+    for (int j = 0; j < m; ++j) { \
+        _Pragma("HLS PIPELINE II=1") \
+        _Pragma("HLS LOOP_TRIPCOUNT min=0 max=STEP_MEAS_MAX_GEN") \
+        const int lane = j & (ACCUM_LANES - 1); \
+        const data_t h_dot_c = H_inout[CIDX][j]; \
+        acc[lane][0] += H_inout[(BASE) + 0][j] * h_dot_c; \
+        acc[lane][1] += H_inout[(BASE) + 1][j] * h_dot_c; \
+        acc[lane][2] += H_inout[(BASE) + 2][j] * h_dot_c; \
+        acc[lane][3] += H_inout[(BASE) + 3][j] * h_dot_c; \
+    } \
+    data_t hht0 = 0.0f; \
+    data_t hht1 = 0.0f; \
+    data_t hht2 = 0.0f; \
+    data_t hht3 = 0.0f; \
+    for (int l = 0; l < ACCUM_LANES; ++l) { \
+        _Pragma("HLS UNROLL") \
+        hht0 += acc[l][0]; \
+        hht1 += acc[l][1]; \
+        hht2 += acc[l][2]; \
+        hht3 += acc[l][3]; \
+    } \
+    data_t denom_hht = hht0; \
+    if ((CIDX) == (BASE) + 1) denom_hht = hht1; \
+    else if ((CIDX) == (BASE) + 2) denom_hht = hht2; \
+    else if ((CIDX) == (BASE) + 3) denom_hht = hht3; \
+    const data_t denom = phi_meas * phi_meas + denom_hht; \
+    data_t lambda0 = 0.0f; \
+    data_t lambda1 = 0.0f; \
+    data_t lambda2 = 0.0f; \
+    data_t lambda3 = 0.0f; \
+    if (std::fabs(denom) >= 1e-12f) { \
+        const data_t inv_denom = 1.0f / denom; \
+        lambda0 = hht0 * inv_denom; \
+        lambda1 = hht1 * inv_denom; \
+        lambda2 = hht2 * inv_denom; \
+        lambda3 = hht3 * inv_denom; \
+    } \
+    for (int j = 0; j < m; ++j) { \
+        _Pragma("HLS LOOP_TRIPCOUNT min=0 max=STEP_MEAS_MAX_GEN") \
+        _Pragma("HLS PIPELINE II=1") \
+        _Pragma("HLS DEPENDENCE variable=H_inout inter false") \
+        const data_t t = H_inout[CIDX][j]; \
+        H_inout[(BASE) + 0][j] -= lambda0 * t; \
+        H_inout[(BASE) + 1][j] -= lambda1 * t; \
+        H_inout[(BASE) + 2][j] -= lambda2 * t; \
+        H_inout[(BASE) + 3][j] -= lambda3 * t; \
+    } \
+    for (int i = 0; i < N_STATE; ++i) { \
+        _Pragma("HLS UNROLL") \
+        H_inout[i][m] = 0.0f; \
+    } \
+    p_inout[(BASE) + 0] += lambda0 * r; H_inout[(BASE) + 0][m] = phi_meas * lambda0; \
+    p_inout[(BASE) + 1] += lambda1 * r; H_inout[(BASE) + 1][m] = phi_meas * lambda1; \
+    p_inout[(BASE) + 2] += lambda2 * r; H_inout[(BASE) + 2][m] = phi_meas * lambda2; \
+    p_inout[(BASE) + 3] += lambda3 * r; H_inout[(BASE) + 3][m] = phi_meas * lambda3; \
+    *m_inout = m + 1; \
+}
+
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b0_s0, 0, 0)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b0_s1, 0, 1)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b4_s4, 4, 4)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b4_s5, 4, 5)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b8_s8, 8, 8)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b8_s9, 8, 9)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b12_s12, 12, 12)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b12_s13, 12, 13)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b16_s16, 16, 16)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b16_s17, 16, 17)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b20_s20, 20, 20)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b20_s21, 20, 21)
 
 void predict_kernel(
     const data_t p_x[N_STATE],
@@ -249,7 +346,7 @@ void zonotope_step_kernel(
     data_t col_tmp[N_STATE];
 #pragma HLS ARRAY_PARTITION variable=col_tmp complete dim=1
     for (int k = 0; k < m; ++k) {
-#pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
+#pragma HLS LOOP_TRIPCOUNT min=0 max=REDUCTION_BUDGET
 #pragma HLS DEPENDENCE variable=H_inout inter false
         for (int b = 0; b < OSC_BLOCKS; ++b) {
 #pragma HLS PIPELINE II=1
@@ -284,7 +381,7 @@ void zonotope_step_kernel(
 
     // 1c. Append process-noise generators H_w
     for (int k = 0; k < m_w; ++k) {
-#pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
+#pragma HLS LOOP_TRIPCOUNT min=0 max=N_STATE
 #pragma HLS DEPENDENCE variable=H_inout inter false
         for (int i = 0; i < N_STATE; ++i) {
 #pragma HLS UNROLL factor=STATE_PAR
@@ -295,109 +392,27 @@ void zonotope_step_kernel(
 
     // 2. Early reduce if prediction exceeds budget
     if (m > REDUCTION_BUDGET) {
+        assert(m <= REDUCE_INPUT_MAX_GEN);
         zonotope_reduce(H_inout, &m);
     }
 
-    // 3. Strip updates — fully IN-PLACE on p_inout / H_inout
-    for (int meas = 0; meas < N_MEAS; ++meas) {
-        const int meas_state = meas_state_index(meas);
-        const data_t phi_meas = phi[meas];
-        const data_t residual = p_inout[meas_state];
-        const data_t r = y[meas] - residual;
-        data_t lambda[N_STATE];
-#pragma HLS ARRAY_PARTITION variable=lambda complete dim=1
-
-        compute_lambda_segment(lambda, H_inout, m, meas_state, phi_meas);
-
-        // Update H a bank-aligned block at a time. Keep only half a bank
-        // active per cycle here; the recovered fast lambda path already
-        // pushes timing hard, and the full 8-lane update becomes the
-        // dominant critical path at fpga_kernels.cpp:344.
-        for (int j = 0; j < m; ++j) {
-#pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
-#pragma HLS PIPELINE II=1
-#pragma HLS DEPENDENCE variable=H_inout inter false
-            const data_t t = H_inout[meas_state][j];
-            H_inout[ 0][j] -= lambda[ 0] * t;
-            H_inout[ 1][j] -= lambda[ 1] * t;
-            H_inout[ 2][j] -= lambda[ 2] * t;
-            H_inout[ 3][j] -= lambda[ 3] * t;
-            H_inout[ 4][j] -= lambda[ 4] * t;
-            H_inout[ 5][j] -= lambda[ 5] * t;
-            H_inout[ 6][j] -= lambda[ 6] * t;
-            H_inout[ 7][j] -= lambda[ 7] * t;
-            H_inout[ 8][j] -= lambda[ 8] * t;
-            H_inout[ 9][j] -= lambda[ 9] * t;
-            H_inout[10][j] -= lambda[10] * t;
-            H_inout[11][j] -= lambda[11] * t;
-            H_inout[12][j] -= lambda[12] * t;
-            H_inout[13][j] -= lambda[13] * t;
-            H_inout[14][j] -= lambda[14] * t;
-            H_inout[15][j] -= lambda[15] * t;
-            H_inout[16][j] -= lambda[16] * t;
-            H_inout[17][j] -= lambda[17] * t;
-            H_inout[18][j] -= lambda[18] * t;
-            H_inout[19][j] -= lambda[19] * t;
-            H_inout[20][j] -= lambda[20] * t;
-            H_inout[21][j] -= lambda[21] * t;
-            H_inout[22][j] -= lambda[22] * t;
-            H_inout[23][j] -= lambda[23] * t;
-        }
-
-        // Fuse the p update and generator append so each 8-lane sweep over
-        // state executes once per measurement instead of twice.
-        const data_t lambda_0 = lambda[0];
-        const data_t lambda_1 = lambda[1];
-        const data_t lambda_2 = lambda[2];
-        const data_t lambda_3 = lambda[3];
-        const data_t lambda_4 = lambda[4];
-        const data_t lambda_5 = lambda[5];
-        const data_t lambda_6 = lambda[6];
-        const data_t lambda_7 = lambda[7];
-        p_inout[0] += lambda_0 * r;  H_inout[0][m] = phi_meas * lambda_0;
-        p_inout[1] += lambda_1 * r;  H_inout[1][m] = phi_meas * lambda_1;
-        p_inout[2] += lambda_2 * r;  H_inout[2][m] = phi_meas * lambda_2;
-        p_inout[3] += lambda_3 * r;  H_inout[3][m] = phi_meas * lambda_3;
-        p_inout[4] += lambda_4 * r;  H_inout[4][m] = phi_meas * lambda_4;
-        p_inout[5] += lambda_5 * r;  H_inout[5][m] = phi_meas * lambda_5;
-        p_inout[6] += lambda_6 * r;  H_inout[6][m] = phi_meas * lambda_6;
-        p_inout[7] += lambda_7 * r;  H_inout[7][m] = phi_meas * lambda_7;
-        const data_t lambda_8 = lambda[8];
-        const data_t lambda_9 = lambda[9];
-        const data_t lambda_10 = lambda[10];
-        const data_t lambda_11 = lambda[11];
-        const data_t lambda_12 = lambda[12];
-        const data_t lambda_13 = lambda[13];
-        const data_t lambda_14 = lambda[14];
-        const data_t lambda_15 = lambda[15];
-        p_inout[8] += lambda_8 * r;    H_inout[8][m] = phi_meas * lambda_8;
-        p_inout[9] += lambda_9 * r;    H_inout[9][m] = phi_meas * lambda_9;
-        p_inout[10] += lambda_10 * r;  H_inout[10][m] = phi_meas * lambda_10;
-        p_inout[11] += lambda_11 * r;  H_inout[11][m] = phi_meas * lambda_11;
-        p_inout[12] += lambda_12 * r;  H_inout[12][m] = phi_meas * lambda_12;
-        p_inout[13] += lambda_13 * r;  H_inout[13][m] = phi_meas * lambda_13;
-        p_inout[14] += lambda_14 * r;  H_inout[14][m] = phi_meas * lambda_14;
-        p_inout[15] += lambda_15 * r;  H_inout[15][m] = phi_meas * lambda_15;
-        const data_t lambda_16 = lambda[16];
-        const data_t lambda_17 = lambda[17];
-        const data_t lambda_18 = lambda[18];
-        const data_t lambda_19 = lambda[19];
-        const data_t lambda_20 = lambda[20];
-        const data_t lambda_21 = lambda[21];
-        const data_t lambda_22 = lambda[22];
-        const data_t lambda_23 = lambda[23];
-        p_inout[16] += lambda_16 * r;  H_inout[16][m] = phi_meas * lambda_16;
-        p_inout[17] += lambda_17 * r;  H_inout[17][m] = phi_meas * lambda_17;
-        p_inout[18] += lambda_18 * r;  H_inout[18][m] = phi_meas * lambda_18;
-        p_inout[19] += lambda_19 * r;  H_inout[19][m] = phi_meas * lambda_19;
-        p_inout[20] += lambda_20 * r;  H_inout[20][m] = phi_meas * lambda_20;
-        p_inout[21] += lambda_21 * r;  H_inout[21][m] = phi_meas * lambda_21;
-        p_inout[22] += lambda_22 * r;  H_inout[22][m] = phi_meas * lambda_22;
-        p_inout[23] += lambda_23 * r;  H_inout[23][m] = phi_meas * lambda_23;
-        m += 1;
-    }
+    // 3. Strip updates. The measurement pattern is fixed for this model:
+    // two observed states per independent 4-state oscillator block.
+    apply_meas_b0_s0(p_inout, H_inout, &m, y[0], phi[0]);
+    apply_meas_b0_s1(p_inout, H_inout, &m, y[1], phi[1]);
+    apply_meas_b4_s4(p_inout, H_inout, &m, y[2], phi[2]);
+    apply_meas_b4_s5(p_inout, H_inout, &m, y[3], phi[3]);
+    apply_meas_b8_s8(p_inout, H_inout, &m, y[4], phi[4]);
+    apply_meas_b8_s9(p_inout, H_inout, &m, y[5], phi[5]);
+    apply_meas_b12_s12(p_inout, H_inout, &m, y[6], phi[6]);
+    apply_meas_b12_s13(p_inout, H_inout, &m, y[7], phi[7]);
+    apply_meas_b16_s16(p_inout, H_inout, &m, y[8], phi[8]);
+    apply_meas_b16_s17(p_inout, H_inout, &m, y[9], phi[9]);
+    apply_meas_b20_s20(p_inout, H_inout, &m, y[10], phi[10]);
+    apply_meas_b20_s21(p_inout, H_inout, &m, y[11], phi[11]);
 
     // 4. Final reduce
+    assert(m <= STEP_MEAS_MAX_GEN);
     zonotope_reduce(H_inout, &m);
 
     // 5. Write back only m (p_inout and H_inout modified in-place above)
@@ -597,6 +612,8 @@ void zonotope_batch_kernel_axi(
 #pragma HLS ARRAY_PARTITION variable=H_local    cyclic factor=STATE_PAR dim=1
 
     int m_local = *m_inout;
+    assert(m_local >= 0 && m_local <= MAX_GEN);
+    assert(m_w >= 0 && m_w <= MAX_GEN);
     assert(n_steps >= 0 && n_steps <= N_BATCH);
     const int need_reload = reload_params || !params_valid;
 
@@ -606,8 +623,9 @@ void zonotope_batch_kernel_axi(
         p_local[i] = p_inout[i];
     }
     for (int r = 0; r < N_STATE; ++r) {
-        for (int c = 0; c < MAX_GEN; ++c) {
+        for (int c = 0; c < m_local; ++c) {
 #pragma HLS PIPELINE II=1
+#pragma HLS LOOP_TRIPCOUNT min=0 max=REDUCTION_BUDGET
             H_local[r][c] = H_inout[r * MAX_GEN + c];
         }
     }
@@ -625,8 +643,9 @@ void zonotope_batch_kernel_axi(
             }
         }
         for (int r = 0; r < N_STATE; ++r) {
-            for (int c = 0; c < MAX_GEN; ++c) {
+            for (int c = 0; c < m_w; ++c) {
 #pragma HLS PIPELINE II=1
+#pragma HLS LOOP_TRIPCOUNT min=0 max=N_STATE
                 H_w_cache[r][c] = H_w[r * MAX_GEN + c];
             }
         }
@@ -669,8 +688,9 @@ void zonotope_batch_kernel_axi(
         p_inout[i] = p_local[i];
     }
     for (int r = 0; r < N_STATE; ++r) {
-        for (int c = 0; c < MAX_GEN; ++c) {
+        for (int c = 0; c < m_local; ++c) {
 #pragma HLS PIPELINE II=1
+#pragma HLS LOOP_TRIPCOUNT min=0 max=REDUCTION_BUDGET
             H_inout[r * MAX_GEN + c] = H_local[r][c];
         }
     }
