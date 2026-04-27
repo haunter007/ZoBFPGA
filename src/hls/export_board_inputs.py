@@ -104,6 +104,7 @@ def export_inputs(args: argparse.Namespace) -> Path:
     x_true = np.zeros(args.n_state, dtype=np.float32)
     for b in range(args.n_state // 4):
         x_true[4 * b] = 1.0
+    x_true_seq = np.zeros((args.n_steps, args.n_state), dtype=np.float32)
 
     phi_vec = np.full(args.n_meas, args.meas_noise, dtype=np.float32)
     y_all = np.zeros((args.n_steps, args.n_meas), dtype=np.float32)
@@ -112,12 +113,14 @@ def export_inputs(args: argparse.Namespace) -> Path:
     for k in range(args.n_steps):
         w_k = np.array([uniform_noise(args.proc_noise) for _ in range(args.n_state)], dtype=np.float32)
         x_true = (A @ x_true + w_k).astype(np.float32)
+        x_true_seq[k, :] = x_true
         for j in range(args.n_meas):
             v = uniform_noise(args.meas_noise)
             y_all[k, j] = np.float32(C[j] @ x_true + v)
             phi_all[k, j] = phi_vec[j]
 
     np.save(out_dir / "A.npy", A)
+    np.save(out_dir / "x_true.npy", x_true_seq)
     np.save(out_dir / "y_all.npy", y_all)
     np.save(out_dir / "phi_all.npy", phi_all)
     np.save(out_dir / "p_input.npy", p_input)
@@ -125,6 +128,7 @@ def export_inputs(args: argparse.Namespace) -> Path:
     np.save(out_dir / "p_w.npy", p_w)
     np.save(out_dir / "H_w.npy", H_w)
     np.savetxt(out_dir / "A.csv", A, delimiter=",", fmt="%.9g")
+    np.savetxt(out_dir / "x_true.csv", x_true_seq, delimiter=",", fmt="%.9g")
     np.savetxt(out_dir / "y_all.csv", y_all, delimiter=",", fmt="%.9g")
     np.savetxt(out_dir / "phi_all.csv", phi_all, delimiter=",", fmt="%.9g")
     np.savetxt(out_dir / "p_input.csv", p_input.reshape(1, -1), delimiter=",", fmt="%.9g")
@@ -157,6 +161,7 @@ def export_inputs(args: argparse.Namespace) -> Path:
         f"h_init_cols={h_init_cols}",
         f"m_w={m_w}",
         f"A_shape={A.shape}",
+        f"x_true_shape={x_true_seq.shape}",
         f"y_all_shape={y_all.shape}",
         f"phi_all_shape={phi_all.shape}",
         f"p_input_shape={p_input.shape}",
@@ -173,6 +178,7 @@ def main() -> None:
     out_dir = export_inputs(args)
     print(f"Saved inputs under: {out_dir}")
     print(f"A:      {out_dir / 'A.npy'}")
+    print(f"x_true: {out_dir / 'x_true.npy'}")
     print(f"y_all:  {out_dir / 'y_all.npy'}")
     print(f"phi_all:{out_dir / 'phi_all.npy'}")
     print(f"p_input:{out_dir / 'p_input.npy'}")
