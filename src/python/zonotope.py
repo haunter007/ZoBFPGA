@@ -12,6 +12,7 @@ Requires:
     matplotlib
 """
 
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import profile
@@ -24,16 +25,16 @@ import time
 # =============================================================================
 
 # State dimension 状态维度
-N_STATE = 4          # n 
+N_STATE = 24          # n  (6 coupled oscillator blocks × 4)
 
 # Input dimension 输入维度
 N_INPUT = 1          # n_u 
 
 # Number of scalar measurements 测量维度
-N_MEAS = 2     # n_y
+N_MEAS = 12    # n_y (2 measurements per 4x4 oscillator block)
 
 # Number of simulation steps 仿真步数
-NUM_STEPS = 15
+NUM_STEPS = int(os.getenv("ZONO_NUM_STEPS", "100"))
 
 # Sampling time 采样时间
 DT = 0.1            
@@ -48,14 +49,14 @@ MEAS_NOISE_RADIUS = 0.1  # 0.1
 INIT_RADIUS = 0.2  # 0.2
 
 # Zonotope reduction budget (max # of generators kept before row-sum aggregation) 
-REDUCTION_BUDGET = 8
+REDUCTION_BUDGET = 32
 
 # Random seed for reproducibility 随机种子用于可重复性？
 RANDOM_SEED = 42
 
 # Output partition for Python-vs-HLS comparison results
 OUTPUT_PARTITION = "python_hls_compare"
-HLS_REF_MODE = "cosim"             # csim/cosim/ (prefer cosim if available)
+HLS_REF_MODE = "csim"              # csim/cosim/ (prefer current step_axi csim)
 HLS_REF_METHOD = "LAMBDA_SEGMENT"  # LAMBDA_P_RADIUS/LAMBDA_SEGMENT/LAMBDA_VOLUME/NONE
 ESTIMATION_METHOD = "segment"      # 'None', 'segment', 'p_radius', 'volume'
 
@@ -171,7 +172,9 @@ def fpga_strip_update_kernel(p, H, c, y, phi, lam):
     lam = np.asarray(lam, dtype=float).reshape(-1, 1)  # (n,1)
 
     # scalar residual = c^T p
-    residual = float(c.T @ p.reshape(-1, 1))
+    #GABRIELE
+    #residual = float(c.T @ p.reshape(-1, 1))
+    residual = (c.T @ p.reshape(-1, 1)).item()
     r = y - residual
 
     # p_hat = p + λ r
@@ -371,97 +374,49 @@ class Zonotope:
     
     def _optimal_lambda_volume(self, c, phi):
         """
-        Volume minimization based on determinant upper bound:
-            minimize det(H_hat H_hat^T)
+        Closed-form volume lambda, aligned with C++ and HLS implementations.
 
-        Reference:
-            Alamo et al., Automatica 2005
+        Derivation: minimise the scalar alpha that scales c such that
+            alpha = ||c^T H||^2 / (||c||^2 * (||c^T H||^2 + phi^2))
+            lambda = alpha * c
+
+        This matches compute_lambda_volume() in zonotope_operations.cpp and
+        the HLS kernel exactly, enabling fair cross-platform comparison.
         """
-        from scipy.optimize import minimize
-
         c = np.asarray(c, dtype=float).reshape(-1)
-        n = self.n
-
-        # --- 初始值：segment minimization ---
-        lam0 = self._optimal_lambda_segment(c, phi)
-
-        # --- 目标函数：log det(H H^T)（数值更稳定）---
-        def cost(lam):
-            lam = np.asarray(lam, dtype=float).reshape(-1)
-
-            # 使用与你 estimator 完全一致的 strip 更新
-            _, H_hat = fpga_strip_update_kernel(
-                p=self.p,
-                H=self.H,
-                c=c,
-                y=0.0,      # 对体积来说，y 不影响 H_hat
-                phi=phi,
-                lam=lam
-            )
-
-            G = H_hat @ H_hat.T
-
-            # 数值正定性保护 # Numerical positive-definite safeguard
-            eps = 1e-9
-            G = G + eps * np.eye(n)
-
-            sign, logdet = np.linalg.slogdet(G)
-            if sign <= 0:
-                return np.inf
-
-            return logdet   # log(det)
-
-        # --- 约束：防止 λ 爆炸 --- # --- Constraint: prevent lambda blow-up ---
-        bounds = [(-10.0, 10.0)] * n
-
-        res = minimize(    # “The optimal λ is obtained by solving a nonlinear optimization problem.”
-            cost,
-            lam0,
-            method="L-BFGS-B",
-            bounds=bounds,
-            options={"maxiter": 50, "ftol": 1e-8}
-        )
-
-        if not res.success:
-            # fallback：segment 方法
-            return lam0
-
-        return res.x
-
-        
-        # def cost(alpha):
-        #     lam = alpha * c.flatten()
-        #     p_hat, H_hat = fpga_strip_update_kernel(
-        #         self.p, self.H, c.flatten(), 0, phi, lam)
-        #     # 近似体积：行列式 # Approximate volume: determinant
-        #     cov_approx = H_hat @ H_hat.T
-        #     return np.linalg.det(cov_approx)
-        
-        # result = minimize_scalar(cost, bounds=(-5, 5), method='bounded')
-        # return result.x * c.flatten()
+        t = self.H.T @ c          # (m,)  t_j = c^T h_j
+        t_sq = float(np.dot(t, t))
+        c_sq = float(np.dot(c, c))
+        denom = c_sq * (t_sq + phi ** 2)
+        alpha = (t_sq / denom) if denom > 1e-12 else 0.0
+        return alpha * c
 
     # -------------------------------------------------------------------------
     # REDUCTION (uses fpga_row_sum_kernel for the row-sum part)
     # -------------------------------------------------------------------------
     def reduce(self, max_gens):
         """
-        Simple order reduction:
+        Order reduction aligned with C++ and HLS implementations.
 
-        - Keep the max_gens generators with largest norm.
-        - Aggregate the rest via a row-sum diagonal bound, using the result
-          of fpga_row_sum_kernel.
+        Strategy: keep the (max_gens - n) generators with largest L2 norm,
+        aggregate the rest into a diagonal box via row-sum of absolute values.
+        Final generator count = (max_gens - n) + n = max_gens.
+
+        This matches zonotope_reduce() in zonotope_operations.cpp exactly.
         """
         m = self.m
         if m <= max_gens:
             return self
 
-        # Norm of each generator axis=0计算每一列的范数 当不指定 ord参数时，默认计算的是2-范数（欧几里得范数）
-        col_norms = np.linalg.norm(self.H, axis=0) 
+        n = self.n  # state dimension (= N_STATE = 4)
+        # keep_count: slots for "real" generators; n slots reserved for diag box
+        keep_count = max(0, max_gens - n)
 
-        # Sort by decreasing norm
-        idx_sorted = np.argsort(-col_norms) # 此函数默认返回的是数组元素从小到大（升序）排序的索引 # This function returns indices sorted in ascending order by default
-        keep_idx = idx_sorted[:max_gens]
-        drop_idx = idx_sorted[max_gens:]
+        col_norms = np.linalg.norm(self.H, axis=0)
+        idx_sorted = np.argsort(-col_norms)  # descending
+
+        keep_idx = idx_sorted[:keep_count]
+        drop_idx = idx_sorted[keep_count:]
 
         H_keep = self.H[:, keep_idx]
         H_drop = self.H[:, drop_idx]
@@ -469,10 +424,10 @@ class Zonotope:
         # Row-sum of abs(H_drop) via FPGA candidate kernel
         row_sum = fpga_row_sum_kernel(H_drop)
 
-        # Row-sum diagonal matrix
+        # Diagonal box appended as n extra generators
         rs_matrix = np.diag(row_sum)
 
-        H_red = np.concatenate([H_keep, rs_matrix], axis=1) # 水平方向拼接 # Concatenate horizontally
+        H_red = np.concatenate([H_keep, rs_matrix], axis=1)  # shape (n, max_gens)
 
         return Zonotope(self.p, H_red)
 
@@ -575,57 +530,65 @@ def system_matrices(k, dt=DT):        # DT=0.1-Sampling time 采样时间
 
     # Embed 2D rotation in the top-left 2×2 block
     # 左上角 2x2 块嵌入了一个旋转矩阵
-    if N_STATE >= 2:
-        A_k[0:2, 0:2] = np.array([[cth, -1.5*sth],
-                                  [1.5*sth,  cth]])
-        eps = 0.1
-        delta = 0.05
-        A_k[0,2] = eps
-        A_k[1,3] = eps
-        A_k[2,0] = -delta
-        A_k[3,1] = -delta
+    #GABRIELE i changed dynamics
+    #if N_STATE >= 2:
+    #    A_k[0:2, 0:2] = np.array([[cth, -1.5*sth],
+    #                              [1.5*sth,  cth]])
+    #    eps = 0.1
+    #    delta = 0.05
+    #    A_k[0,2] = eps
+    #    A_k[1,3] = eps
+    #    A_k[2,0] = -delta
+    #    A_k[3,1] = -delta
+
+    omega = 0.5  # Frequency of oscillation
+    zeta = 0.05  # Damping ratio (to keep it from oscillating forever)
+    
+    # A_k: Uses a rotation-like structure to simulate oscillation
+    c = np.cos(omega * dt) * np.exp(-zeta * dt)
+    s = np.sin(omega * dt) * np.exp(-zeta * dt)
+
+    # Each 4x4 block is an oscillator; they are coupled at the corners
+    A_block = np.array([
+        [ c, -s, 0.1, 0.0],
+        [ s,  c, 0.0, 0.1],
+        [-0.1, 0.0, c, -s],
+        [ 0.0,-0.1, s,  c]
+    ])
+    A_k = np.zeros((N_STATE, N_STATE))
+    for i in range(N_STATE // 4):
+        start = i * 4
+        A_k[start:start+4, start:start+4] = A_block
 
     # No actual control input, but keep the dimension
     B_k = np.zeros((N_STATE, N_INPUT))
 
-    # C_k: coupled measurement model (assumes N_STATE=4, N_MEAS=2)
-    # [x0 + x2, x1 + x3]
-    C_k = np.array([[1.0, 0.0, 0.0, 0.0],
-                    [0.0, 1.0, 0.0, 0.0]])
+    # C_k: for each 4x4 oscillator block, measure its first two states.
+    C_k = np.zeros((N_MEAS, N_STATE))
+    for block in range(N_STATE // 4):
+        meas_base = block * 2
+        state_base = block * 4
+        if meas_base + 1 < N_MEAS:
+            C_k[meas_base + 0, state_base + 0] = 1.0
+            C_k[meas_base + 1, state_base + 1] = 1.0
 
     return A_k, B_k, C_k
 
-
-def observability_rank(A, C, tol=None):
-    """
-    Frozen-time observability check for pair (A, C):
-        O = [C; CA; ...; CA^(n-1)]
-    Returns rank(O) and the smallest singular value of O.
-    """
-    A = np.asarray(A, dtype=float)
-    C = np.asarray(C, dtype=float)
-    n = A.shape[0]
-
-    O = np.vstack([C @ np.linalg.matrix_power(A, i) for i in range(n)])
-    svals = np.linalg.svd(O, compute_uv=False)
-    if svals.size == 0:
-        return 0, 0.0
-
-    if tol is None:
-        tol = np.finfo(float).eps * max(O.shape) * svals[0]
-    rank = int(np.sum(svals > tol))
-    sigma_min = float(svals[-1])
-    return rank, sigma_min
 
 # 定位仓库根目录。 # Locate the repository root.
 def _repo_root():
     return Path(__file__).resolve().parents[2]
 
 
-def _prepare_output_dirs():
+def _prepare_output_dirs(method_label=None):
     output_root = _repo_root() / "data" / "output"
     base_dir = output_root / OUTPUT_PARTITION
-    python_dir = output_root / "python"
+    # 每个方法独立子目录，与 HLS/C++ 输出结构一致
+    # Each method gets its own subdirectory, consistent with HLS/C++ output structure
+    if method_label:
+        python_dir = output_root / "python" / method_label
+    else:
+        python_dir = output_root / "python"
     compare_dir = base_dir
     python_dir.mkdir(parents=True, exist_ok=True)
     compare_dir.mkdir(parents=True, exist_ok=True)
@@ -752,16 +715,18 @@ def _export_python_outputs(python_dir, x_true_arr, center_est_arr, y_arr, zonoto
     _save_csv(python_dir / "error.csv", err_dump)
 
     step_us = np.asarray(step_time_us, dtype=float)
-    _save_csv(python_dir / "python_time_step_us.csv", step_us.reshape(-1, 1))
+    # 文件名与 HLS/C++ 保持一致，方便对比脚本统一读取
+    # Filename consistent with HLS/C++ for the comparison script
+    _save_csv(python_dir / "kernel_time_step_us.csv", step_us.reshape(-1, 1))
     summary = np.array([[step_us.sum(), step_us.mean() if step_us.size > 0 else 0.0, step_us.size]], dtype=float)
-    _save_csv(python_dir / "python_time_summary_us.csv", summary)
+    _save_csv(python_dir / "kernel_time_summary_us.csv", summary)
 
     for k, zono in enumerate(zonotopes):
         _save_zonotope_csv(python_dir / f"zonotope_{k:03d}.csv", zono)
 
 # 查找 HLS 参考结果目录（如果存在）以进行比较。
 def _find_hls_ref_dir():
-    fpga_root = _repo_root() / "data" / "output" / "fpga"
+    fpga_root = _repo_root() / "data" / "output" / "hls"
 
     candidates = [
         fpga_root / HLS_REF_MODE / HLS_REF_METHOD,
@@ -784,7 +749,7 @@ def _find_hls_ref_dir():
 def _plot_hls_vs_python(compare_dir, x_true_arr, center_est_arr, zonotopes, step_time_us):
     hls_dir = _find_hls_ref_dir()
     if hls_dir is None:
-        print("[INFO] No HLS result directory found under data/output/fpga, skip comparison plots.")
+        print("[INFO] No HLS result directory found under data/output/hls, skip comparison plots.")
         return
 
     hls_center = _load_csv_2d(hls_dir / "center.csv")
@@ -959,9 +924,23 @@ def _plot_hls_vs_python(compare_dir, x_true_arr, center_est_arr, zonotopes, step
 # MAIN SIMULATION + ESTIMATION
 # =============================================================================
 
-def run_example():
+def run_example(method=None, method_label=None):
+    """
+    method: 传入方法字符串，如 'None','segment','p_radius','volume'
+            传 None 时使用全局 ESTIMATION_METHOD
+            method string, e.g. 'None','segment','p_radius','volume'.
+            If None, uses global ESTIMATION_METHOD.
+    method_label: 输出目录名，如 'LAMBDA_NONE'
+                  output directory name, e.g. 'LAMBDA_NONE'
+    """
+    if method is None:
+        method = ESTIMATION_METHOD
+    if method_label is None:
+        method_label = "LAMBDA_" + method.upper()
+
     # NumPy的伪随机数生成器，相同的初始种子（第一个），会生成相同的随机序列
-    np.random.seed(RANDOM_SEED) 
+    # Reset seed per method for fair comparison (same noise sequence)
+    np.random.seed(RANDOM_SEED)
 
     # -----------------------------
     # Process noise zonotope W
@@ -1007,26 +986,25 @@ def run_example():
     step_time_us = []
     # 在循环中添加监测 # Add monitoring in the loop
     size_history = []
-    obs_rows = []
-    min_obs_rank = N_STATE
 
     for k in range(NUM_STEPS):
-        step_start = time.perf_counter()
         A_k, B_k, C_k = system_matrices(k, dt=DT)
-        obs_rank_k, sigma_min_k = observability_rank(A_k, C_k)
-        min_obs_rank = min(min_obs_rank, obs_rank_k)
-        obs_rows.append([k, obs_rank_k, sigma_min_k, 1.0 if obs_rank_k == N_STATE else 0.0])
 
-        # === TRUE SYSTEM === 真实系统仿真
+        # === TRUE SYSTEM === 真实系统仿真（计时外，与 FPGA board 基准对齐）
+        # True system update: outside timing window, aligned with board standard
         w_k = W.sample(n_samples=1)
         u_k = np.zeros(N_INPUT)
         x_true = A_k @ x_true + B_k @ u_k + w_k
         x_true_list.append(x_true.copy())
 
-        # Measurement: y_k = C_k x_k + v_k
+        # Measurement: y_k = C_k x_k + v_k（计时外）// outside timing window
         v_k = V.sample(n_samples=1)   # (N_MEAS,)
         y_k = C_k @ x_true + v_k      # (N_MEAS,)
         y_list.append(y_k.copy())
+
+        # === 计时开始：只包裹纯 estimator（predict → strip × N_MEAS → reduce）===
+        # Start timing: only wrap pure estimator, matching FPGA board AP_START→AP_DONE
+        step_start = time.perf_counter()
 
         # === ESTIMATOR: Prediction ===
         X_pred = X.predict(A_k, B_k, u_k, W)
@@ -1037,15 +1015,17 @@ def run_example():
             c_i = C_k[i, :]                  # (n,)从一个二维数组（或矩阵）C_k中，提取出第 i行的所有元素，并赋值给一个一维向量 c_i
             y_tilde_i = y_k[i] - p_v[i]      # shift by center of meas noise
             phi_i = phi_vec[i]
-            X_upd = X_upd.intersect_with_strip(c=c_i, y=y_tilde_i, phi=phi_i, method=ESTIMATION_METHOD)
+            X_upd = X_upd.intersect_with_strip(c=c_i, y=y_tilde_i, phi=phi_i, method=method)
         ''' method: 'None','segment', 'p_radius', 'volume'''
 
         # === Reduction ===
         X = X_upd.reduce(max_gens=REDUCTION_BUDGET)
 
+        # === 计时结束 // End timing ===
+        step_time_us.append((time.perf_counter() - step_start) * 1e6)
+
         center_est_list.append(X.p.copy())
         zonotopes.append(X.copy())
-        step_time_us.append((time.perf_counter() - step_start) * 1e6)
 
         # 记录Zonotope大小
         zonotope_size = np.sum(np.linalg.norm(X.H, axis=0))
@@ -1066,7 +1046,7 @@ def run_example():
     print("Final true state      :", x_true_arr[-1])
     print("Final estimate center :", center_est_arr[-1])
 
-    base_dir, python_dir, compare_dir = _prepare_output_dirs()
+    base_dir, python_dir, compare_dir = _prepare_output_dirs(method_label)
     _export_python_outputs(
         python_dir=python_dir,
         x_true_arr=x_true_arr,
@@ -1075,7 +1055,6 @@ def run_example():
         zonotopes=zonotopes,
         step_time_us=step_time_us,
     )
-    _save_csv(python_dir / "obs_rank.csv", np.asarray(obs_rows, dtype=float))
     _plot_hls_vs_python(
         compare_dir=compare_dir,
         x_true_arr=x_true_arr,
@@ -1085,67 +1064,83 @@ def run_example():
     )
     print(f"Python outputs exported to: {python_dir}")
     print(f"Python-vs-HLS comparison outputs: {compare_dir}")
-    print(
-        f"Observability check: min rank(O_k) = {min_obs_rank}/{N_STATE} "
-        f"=> {'PASS' if min_obs_rank == N_STATE else 'FAIL'}"
-    )
 
     # -------------------------------------------------------------------------
-    # PLOTS (only first two components if N_STATE >= 2)
+    # COMPREHENSIVE PLOTS (4D Tracking, Phase Analysis, and Error Metrics)
     # -------------------------------------------------------------------------
-    k_grid = np.arange(NUM_STEPS + 1)  # 时间轴，从0到NUM_STEPS
+    import shutil
+    plots_dir = python_dir / "plots"  # 每个方法的 plots 在各自子目录下 // plots per method in its own subdir
+    if plots_dir.exists():
+        shutil.rmtree(plots_dir)
+    plots_dir.mkdir(parents=True)
 
-    if N_STATE >= 1:  # 第一个图形：时间序列对比 # First figure: time-series comparison
-        plt.figure(figsize=(10, 3))   # 创建10×3英寸的图形窗口 # Create a 10x3-inch figure window
-        # 1行2列的第1个子图 # First subplot in a 1x2 layout
-        plt.subplot(1, 2, 1) 
-        # 真实状态的第一个分量（x₁）随时间变化。实线带圆点标记
-        plt.plot(k_grid, x_true_arr[:, 0], '-o', label='x_1 true')  
-        # 估计Zonotope中心的第一个分量。虚线带方块标记（估计轨迹）
-        plt.plot(k_grid, center_est_arr[:, 0], '--s', label='x_1 est')  
-        plt.xlabel('k')
-        plt.ylabel('x_1')
-        plt.grid(True, linestyle=':')
-        plt.legend()
+    k_grid = np.arange(NUM_STEPS + 1)
 
-        if N_STATE >= 2:  # 只有当状态维度≥2时才绘制第二个分量 # Draw the second component only when state dimension >= 2
-            # 1行2列的第2个子图 # Second subplot in a 1x2 layout
-            plt.subplot(1, 2, 2)
-            plt.plot(k_grid, x_true_arr[:, 1], '-o', label='x_2 true')
-            plt.plot(k_grid, center_est_arr[:, 1], '--s', label='x_2 est')
-            plt.xlabel('k')
-            plt.ylabel('x_2')
-            plt.grid(True, linestyle=':')
-            plt.legend()
+    # Calculate Error Metrics
+    # 1. Euclidean distance between center and true state
+    py_error_l2 = np.linalg.norm(center_est_arr - x_true_arr, axis=1)
+    # 2. Maximum distance from true state to any point inside the zonotope
+    py_max_err_l2, _ = _max_error_from_zonotopes(zonotopes, x_true_arr)
 
-        plt.tight_layout()
+    # --- Figure 1: Time-Series for all states ---
+    rows = (N_STATE + 1) // 2
+    cols = 2
+    fig1, axes1 = plt.subplots(rows, cols, figsize=(12, 3 * rows))
+    axes1 = axes1.flatten()
+    for i in range(N_STATE):
+        ax = axes1[i]
+        ax.plot(k_grid, x_true_arr[:, i], 'ro-', label=f'x_{i} true', markersize=3, alpha=0.5)
+        ax.plot(k_grid, center_est_arr[:, i], 'bs--', label=f'x_{i} est', markersize=3)
+        ax.set_xlabel('Step k')
+        ax.set_ylabel(f'Value x_{i}')
+        ax.set_title(f'State x_{i} Tracking')
+        ax.grid(True, linestyle=':', alpha=0.5)
+        ax.legend(fontsize='small')
+    # Clear any unused subplots
+    for j in range(i + 1, len(axes1)):
+        fig1.delaxes(axes1[j])
+    fig1.suptitle(f"Time-Series State Estimation ({N_STATE}D)", fontsize=14)
+    fig1.tight_layout()
+    fig1.savefig(plots_dir / "state_timeseries.png", dpi=160)
+    plt.close(fig1)
 
-    if N_STATE >= 2:
-        # Phase plot (x_1 vs x_2) 第二个图形：相平面图
-        fig2,ax2=plt.subplots(figsize=(8,6))
-        # plt.plot(x_true_arr[:, 0], x_true_arr[:, 1], '-o', label='True')
-        # plt.plot(center_est_arr[:, 0], center_est_arr[:, 1], '--s', label='Estimate center')
-        plt.xlabel('State x_1')
-        plt.ylabel('State x_2')
-        plt.axis('equal')  # 保证x轴和y轴比例尺相同，避免图形变形
-        plt.grid(True, linestyle=':',alpha=0.3)
-        plt.title('True vs estimated state trajectory (first two states)')
-        plt.legend()
-        
-        # 使用Viridis色彩映射（紫→绿→黄）； np.linspace(0, 1, len(zonotopes))：根据zonotope数量在0到1之间均匀生成颜色索引
-        colors = plt.cm.viridis(np.linspace(0, 1, len(zonotopes)))
-        for i, X in enumerate(zonotopes):          # 遍历存储的所有zonotope对象
-            X.plot(ax2, color=colors[i], alpha=0.3)   # 透明度0.3：使重叠区域可见，展示不确定性演化 # Alpha 0.3 makes overlaps visible to show uncertainty evolution
+    # --- Figure 2: Phase Plots with Initial Point Marker ---
+    fig2, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(14, 6))
+    projection_pairs = [(0, 2), (1, 3)]
+    plot_axes = [ax_a, ax_b]
+    colors = plt.cm.viridis(np.linspace(0, 1, len(zonotopes)))
 
-        # ro-：red,circle marker,solid line ; bs--:blue,square marker,dashed line虚线
-        plt.plot(x_true_arr[:, 0], x_true_arr[:, 1], 'ro-', label='True State', linewidth=2, markersize=4)
-        plt.plot(center_est_arr[:, 0], center_est_arr[:, 1], 'bs--', label='Estimated Center', linewidth=1.5, markersize=4)
+    for idx, (dim_x, dim_y) in enumerate(projection_pairs):
+        ax = plot_axes[idx]
+        for i, Z in enumerate(zonotopes):
+            Z.plot(ax, color=colors[i], alpha=0.15, dims=(dim_x, dim_y))
+        ax.plot(x_true_arr[:, dim_x], x_true_arr[:, dim_y], 'r-', label='True Path', alpha=0.6)
+        ax.plot(center_est_arr[:, dim_x], center_est_arr[:, dim_y], 'b--', label='Est. Center')
+        ax.plot(x_true_arr[0, dim_x], x_true_arr[0, dim_y], 'g*', markersize=12, label='START (k=0)', zorder=5)
+        ax.set_xlabel(f'State x_{dim_x}')
+        ax.set_ylabel(f'State x_{dim_y}')
+        ax.set_title(f'Phase: x_{dim_x} vs x_{dim_y}')
+        ax.legend(loc='best', fontsize='small')
+        ax.grid(True, linestyle=':', alpha=0.4)
+    fig2.tight_layout()
+    fig2.savefig(plots_dir / "phase_plots.png", dpi=160)
+    plt.close(fig2)
 
-        
-        plt.legend()
-        plt.tight_layout()
+    # --- Figure 3: Error Norm Analysis ---
+    fig3, ax3 = plt.subplots(figsize=(10, 5))
+    ax3.plot(k_grid, py_error_l2, 'b-o', label='Euclidean Error (Center to True)', markersize=4)
+    ax3.plot(k_grid, py_max_err_l2, 'r--s', label='Max Distance (True to Zonotope Bound)', markersize=4)
+    ax3.fill_between(k_grid, py_error_l2, py_max_err_l2, color='gray', alpha=0.1, label='Uncertainty Range')
+    ax3.set_xlabel('Step k')
+    ax3.set_ylabel('Norm Error ($L_2$)')
+    ax3.set_title('Estimation Error and Bound Performance')
+    ax3.grid(True, linestyle=':', alpha=0.6)
+    ax3.legend()
+    fig3.tight_layout()
+    fig3.savefig(plots_dir / "error_norm.png", dpi=160)
+    plt.close(fig3)
 
-    plt.show()
+    print(f"Python plots saved to: {plots_dir}")
 
     return x_true_arr, center_est_arr, y_arr
 
@@ -1172,7 +1167,7 @@ def simple_profile_kernels():
     n_state = N_STATE
     n_input = N_INPUT
     n_meas = N_MEAS
-    num_test_steps = 50  # 测试循环次数，可调整 # Number of test iterations (adjustable)
+    num_test_steps = 100  # 测试循环次数，可调整 # Number of test iterations (adjustable)
 
     # 生成模拟数据 # Generate mock data
     np.random.seed(RANDOM_SEED)
@@ -1261,8 +1256,11 @@ def simple_profile_kernels():
 if __name__ == "__main__":
     # 运行专项性能测试 # Run the dedicated performance test
     simple_profile_kernels()
-    # 原有的运行代码 # Original runtime code
-    x_true_arr, center_est_arr, y_arr = run_example()
+
+    print(f"\n{'='*60}")
+    print("Running method: LAMBDA_SEGMENT")
+    print(f"{'='*60}")
+    run_example(method="segment", method_label="LAMBDA_SEGMENT")
 
     
 

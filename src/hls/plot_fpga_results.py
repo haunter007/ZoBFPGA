@@ -10,6 +10,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+TARGET_METHODS = ("LAMBDA_NONE", "LAMBDA_SEGMENT", "LAMBDA_VOLUME")
+
 
 def _as_2d(a: np.ndarray) -> np.ndarray:
     if a.size == 0:
@@ -20,7 +22,7 @@ def _as_2d(a: np.ndarray) -> np.ndarray:
 
 
 def _load_numeric_csv(path: Path) -> np.ndarray:
-    if not path.exists():
+    if not path.exists() or path.stat().st_size == 0:
         return np.zeros((0, 0), dtype=float)
     a = np.loadtxt(path, delimiter=",")
     return _as_2d(np.asarray(a, dtype=float))
@@ -97,8 +99,9 @@ def zonotope_vertices_2d(p: np.ndarray, H: np.ndarray, dims=(0, 1), n_dirs: int 
     return np.unique(np.round(verts, 12), axis=0)
 
 
-def plot_zonotope(ax, p: np.ndarray, H: np.ndarray, color: str, alpha: float, n_dirs: int = 180):
-    verts = zonotope_vertices_2d(p, H, n_dirs=n_dirs)
+def plot_zonotope(ax, p: np.ndarray, H: np.ndarray, color: str, alpha: float,
+                  dims=(0, 1), n_dirs: int = 180):
+    verts = zonotope_vertices_2d(p, H, dims=dims, n_dirs=n_dirs)
     if verts.shape[0] == 0:
         ax.plot([p[0]], [p[1]], "o", color=color, markersize=2, alpha=alpha)
         return
@@ -130,6 +133,9 @@ def plot_method(method_dir: Path, n_dirs: int = 180) -> list[Path]:
     ksum = _load_numeric_csv(method_dir / "kernel_time_summary_us.csv")
 
     zonofiles = sorted(method_dir.glob("zonotope_*.csv"))
+    # Guard against stale files from previous runs with more steps
+    if centers.shape[0] > 0:
+        zonofiles = zonofiles[:centers.shape[0]]
 
     out_paths: list[Path] = []
 
@@ -161,6 +167,40 @@ def plot_method(method_dir: Path, n_dirs: int = 180) -> list[Path]:
     plt.close(fig)
     out_paths.append(traj_png)
 
+    # --- Phase plots (match Python style) ---
+    if centers.shape[0] > 0 and centers.shape[1] >= 4:
+        fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+        projection_pairs = [(0, 2), (1, 3)]
+        zonofile_count = max(1, len(zonofiles))
+        colors = plt.cm.viridis(np.linspace(0.0, 1.0, zonofile_count))
+
+        for ax, dims in zip(axes, projection_pairs):
+            for idx, zf in enumerate(zonofiles):
+                p, H = load_zonotope_csv(zf)
+                plot_zonotope(ax, p, H, color=colors[idx], alpha=0.15, dims=dims, n_dirs=n_dirs)
+
+            if true_states.shape[0] > 0 and true_states.shape[1] > max(dims):
+                ax.plot(true_states[:, dims[0]], true_states[:, dims[1]],
+                        "r-", linewidth=1.5, alpha=0.7, label="True Path")
+                ax.plot(true_states[0, dims[0]], true_states[0, dims[1]],
+                        "g*", markersize=12, label="START (k=0)", zorder=5)
+
+            if centers.shape[1] > max(dims):
+                ax.plot(centers[:, dims[0]], centers[:, dims[1]],
+                        "b--", linewidth=1.5, label="Est. Center")
+
+            ax.set_xlabel(f"State x[{dims[0]}]")
+            ax.set_ylabel(f"State x[{dims[1]}]")
+            ax.set_title(f"Phase: x[{dims[0]}] vs x[{dims[1]}]")
+            ax.grid(True, linestyle=":", alpha=0.4)
+            ax.legend(loc="best", fontsize="small")
+
+        fig.tight_layout()
+        phase_png = plots_dir / "phase_plots.png"
+        fig.savefig(phase_png, dpi=160)
+        plt.close(fig)
+        out_paths.append(phase_png)
+
     # --- Error ---
     if err.shape[0] > 0:
         steps = np.arange(err.shape[0])
@@ -183,18 +223,12 @@ def plot_method(method_dir: Path, n_dirs: int = 180) -> list[Path]:
         out_paths.append(err_png)
 
     # --- Kernel timing ---
-    if ktime.shape[0] > 0 and ktime.shape[1] >= 3:
+    if ktime.shape[0] > 0 and ktime.shape[1] >= 1:
         steps = np.arange(ktime.shape[0])
         fig, ax = plt.subplots(figsize=(7.5, 3.8))
-        ax.plot(steps, ktime[:, 0], label="predict_kernel (us)")
-        ax.plot(steps, ktime[:, 1], label="strip_update total/step (us)")
-        ax.plot(steps, ktime[:, 2], label="row_sum_abs_kernel (us)")
+        ax.plot(steps, ktime[:, 0], label="step time (us)")
 
-        title = f"{method_dir.name}: Kernel Time (per step)"
-        if ksum.shape[0] > 0 and ksum.shape[1] >= 9:
-            total_predict, total_strip, total_row = ksum[0, 0], ksum[0, 1], ksum[0, 2]
-            avg_predict, avg_strip, avg_row = ksum[0, 6], ksum[0, 7], ksum[0, 8]
-            title += f"\nTotal(us): pred={total_predict:.1f}, strip={total_strip:.1f}, row={total_row:.1f} | Avg(us): pred={avg_predict:.2f}, strip={avg_strip:.2f}, row={avg_row:.2f}"
+        title = f"{method_dir.name}: single kernel"
 
         ax.set_xlabel("Step")
         ax.set_ylabel("Time (us)")
@@ -213,19 +247,30 @@ def plot_method(method_dir: Path, n_dirs: int = 180) -> list[Path]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mode", default="csim", choices=["csim", "cosim"], help="FPGA simulation mode directory")
+    ap.add_argument("--mode", default="csim", choices=["csim", "csim_batch", "cosim", "cosim_batch", "cpp"],
+                    help="csim/csim_batch/cosim/cosim_batch: HLS sim under data/output/hls/<mode>; cpp: C++ results under data/output/cpp")
     ap.add_argument("--root", default=None, help="Override repo root (defaults to inferred repo root)")
     ap.add_argument("--n-dirs", type=int, default=180, help="Support-function directions for zonotope boundary")
     args = ap.parse_args()
 
     repo_root = Path(args.root).resolve() if args.root else Path(__file__).resolve().parents[2]
-    base = repo_root / "data" / "output" / "fpga" / args.mode
+    # cpp 模式直接读 data/output/cpp，其余读 data/output/hls/<mode>
+    # For cpp mode read data/output/cpp; otherwise data/output/hls/<mode>
+    if args.mode == "cpp":
+        base = repo_root / "data" / "output" / "cpp"
+    else:
+        base = repo_root / "data" / "output" / "hls" / args.mode
     if not base.exists():
         print(f"ERROR: not found: {base}")
-        print(f"Run: make {args.mode}")
+        if args.mode == "cpp":
+            print("Run: cd src/cpp && make run")
+        elif args.mode in ("csim_batch", "cosim_batch"):
+            print("Run: cd src/hls && make csim-batch")
+        else:
+            print(f"Run: make {args.mode}")
         return 2
 
-    methods = sorted([p for p in base.iterdir() if p.is_dir()])
+    methods = sorted([p for p in base.iterdir() if p.is_dir() and p.name in TARGET_METHODS])
     if not methods:
         print(f"ERROR: no method directories under: {base}")
         return 3

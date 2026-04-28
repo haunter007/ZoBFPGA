@@ -1,394 +1,196 @@
-#include <cstdio>
+#include <chrono>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <dirent.h>
+#include <errno.h>
+#include <string>
+#include <sys/stat.h>
+#include <vector>
 
-#include "zonotope.hpp"
-#include "kernels.hpp"
-// #include "kernels.hpp"
 #include "dump.hpp"
+#include "kernels.hpp"
+#include "zonotope.hpp"
 
-// ------------------------------
-// 简单 RNG（HLS/可移植友好）
-// LCG: x = a*x + c
-// ------------------------------
 static unsigned int g_seed = RANDOM_SEED;
-
 static inline double rand01() {
     g_seed = 1664525u * g_seed + 1013904223u;
-    // 取高位做 [0,1) // Use high bits for [0,1)
-    unsigned int v = (g_seed >> 8) & 0x00FFFFFFu;
-    return (double)v / (double)0x01000000u;
+    return (double)((g_seed >> 8) & 0x00FFFFFFu) / 16777216.0;
+}
+static inline data_t uniform_noise(data_t r) {
+    return (data_t)((2.0 * rand01() - 1.0) * r);
 }
 
-static inline double uniform_noise(double r) {
-    // [-r, r]
-    return (2.0 * rand01() - 1.0) * r;
+static void mkdir_p(const std::string& path) {
+    std::string tmp;
+    for (size_t i = 0; i < (int)path.size(); ++i) {
+        tmp += path[i];
+        if (path[i] == '/' || i + 1 == (int)path.size()) {
+            if (tmp != "/") mkdir(tmp.c_str(), 0755);
+        }
+    }
+}
+
+static void csv_append_row(const std::string& path, const data_t* x, int n) {
+    FILE* f = std::fopen(path.c_str(), "a");
+    if (!f) return;
+    for (int i = 0; i < n; ++i) {
+        std::fprintf(f, "%.17g%c", (double)x[i], (i == n - 1) ? '\n' : ',');
+    }
+    std::fclose(f);
+}
+
+// Global buffers to avoid stack overflow and simplify management
+static data_t g_A[N_STATE][N_STATE];
+static data_t g_C[N_MEAS][N_STATE];
+static data_t g_H_w[N_STATE][MAX_GEN];
+static data_t g_H_tmp1[N_STATE][MAX_GEN];
+static data_t g_H_tmp2[N_STATE][MAX_GEN];
+static data_t g_H_tmp3[N_STATE][MAX_GEN];
+static Zonotope g_X;
+
+static void prepare_synthetic_batch_inputs(
+    std::vector<std::vector<data_t>>& x_true_seq,
+    std::vector<std::vector<data_t>>& y_seq
+) {
+    x_true_seq.assign(NUM_STEPS, std::vector<data_t>(N_STATE, 0.0f));
+    y_seq.assign(NUM_STEPS, std::vector<data_t>(N_MEAS, 0.0f));
+
+    std::vector<data_t> x_true(N_STATE, 0.0f);
+    for (int b = 0; b < N_STATE / 4; ++b) x_true[b * 4] = 1.0f;
+
+    for (int k = 0; k < NUM_STEPS; ++k) {
+        std::vector<data_t> x_next(N_STATE, 0.0f);
+        for (int i = 0; i < N_STATE; ++i) {
+            for (int j = 0; j < N_STATE; ++j) x_next[i] += g_A[i][j] * x_true[j];
+            x_next[i] += uniform_noise(PROC_NOISE_RADIUS);
+        }
+        x_true = x_next;
+        x_true_seq[k] = x_true;
+
+        for (int i = 0; i < N_MEAS; ++i) {
+            data_t tmp = 0.0f;
+            for (int j = 0; j < N_STATE; ++j) tmp += g_C[i][j] * x_true[j];
+            y_seq[k][i] = tmp + uniform_noise(MEAS_NOISE_RADIUS);
+        }
+    }
+}
+
+static void run_one_method(LambdaMethod method, const char* method_name, const std::string& out_base) {
+    g_seed = RANDOM_SEED;
+    const std::string out_dir = out_base + "/" + method_name;
+    mkdir_p(out_dir);
+
+    const std::string center_csv = out_dir + "/center.csv";
+    const std::string x_true_csv = out_dir + "/x_true.csv";
+    const std::string meas_csv   = out_dir + "/meas.csv";
+    const std::string error_csv  = out_dir + "/error.csv";
+    const std::string ktime_csv  = out_dir + "/kernel_time_step_us.csv";
+    const std::string ksum_csv   = out_dir + "/kernel_time_summary_us.csv";
+
+    dump_reset_file(center_csv.c_str()); dump_reset_file(x_true_csv.c_str());
+    dump_reset_file(meas_csv.c_str()); dump_reset_file(error_csv.c_str());
+    dump_reset_file(ktime_csv.c_str()); dump_reset_file(ksum_csv.c_str());
+
+    const data_t omega = 0.5f, zeta = 0.05f, dt = DT, decay = std::exp(-zeta * dt);
+    const data_t c_val = std::cos(omega * dt) * decay, s_val = std::sin(omega * dt) * decay, eps = 0.1f;
+
+    std::memset(g_A, 0, sizeof(g_A));
+    data_t A_block[4][4] = {{c_val,-s_val,eps,0},{s_val,c_val,0,eps},{-eps,0,c_val,-s_val},{0,-eps,s_val,c_val}};
+    for (int b = 0; b < N_STATE/4; ++b)
+        for (int i = 0; i < 4; ++i)
+            for (int j = 0; j < 4; ++j)
+                g_A[b*4+i][b*4+j] = A_block[i][j];
+
+    std::memset(g_C, 0, sizeof(g_C));
+    for (int block = 0; block < N_STATE / 4; ++block) {
+        const int meas_base = block * 2;
+        const int state_base = block * 4;
+        if (meas_base + 1 < N_MEAS) {
+            g_C[meas_base + 0][state_base + 0] = 1.0f;
+            g_C[meas_base + 1][state_base + 1] = 1.0f;
+        }
+    }
+
+    std::vector<std::vector<data_t>> x_true_seq;
+    std::vector<std::vector<data_t>> y_seq;
+    prepare_synthetic_batch_inputs(x_true_seq, y_seq);
+
+    g_X.n = N_STATE; g_X.m = N_STATE;
+    for (int i = 0; i < N_STATE; ++i) {
+        g_X.p[i] = 0.0f;
+        for (int j = 0; j < MAX_GEN; ++j) g_X.H[i][j] = 0.0f;
+    }
+    for (int b = 0; b < N_STATE / 4; ++b) {
+        g_X.p[b * 4] = 1.0f;
+    }
+    for (int i = 0; i < N_STATE; ++i) {
+        g_X.H[i][i] = INIT_RADIUS;
+    }
+
+    std::memset(g_H_w, 0, sizeof(g_H_w));
+    for (int i = 0; i < N_STATE; ++i) g_H_w[i][i] = PROC_NOISE_RADIUS;
+
+    std::vector<data_t> p_w(N_STATE, 0.0f);
+    std::vector<data_t> p_pred(N_STATE, 0.0f);
+    std::vector<data_t> p_upd(N_STATE, 0.0f);
+    std::vector<data_t> p_next2(N_STATE, 0.0f);
+    std::vector<data_t> err(N_STATE + 1, 0.0f);
+    data_t total_us = 0.0f;
+    auto t0 = std::chrono::high_resolution_clock::now();
+    for (int k = 0; k < NUM_STEPS; ++k) {
+        const std::vector<data_t>& x_true = x_true_seq[k];
+        const std::vector<data_t>& y_k = y_seq[k];
+        csv_append_row(meas_csv, y_k.data(), N_MEAS);
+
+        int m_pred = 0;
+        predict_kernel(g_X.p, g_X.H, g_X.m, g_A, p_w.data(), g_H_w, N_STATE, p_pred.data(), g_H_tmp1, &m_pred);
+
+        std::memcpy(p_upd.data(), p_pred.data(), sizeof(data_t) * N_STATE);
+        int m_upd = m_pred;
+        std::memcpy(g_H_tmp2, g_H_tmp1, sizeof(g_H_tmp2));
+
+        for (int meas = 0; meas < N_MEAS; ++meas) {
+            data_t lambda[N_STATE];
+            if (method == LAMBDA_NONE) { for (int j=0; j<N_STATE; ++j) lambda[j] = g_C[meas][j]; }
+            else if (method == LAMBDA_SEGMENT) compute_lambda_segment(lambda, g_H_tmp2, m_upd, g_C[meas], MEAS_NOISE_RADIUS);
+            else if (method == LAMBDA_VOLUME) compute_lambda_volume(lambda, g_H_tmp2, m_upd, g_C[meas], MEAS_NOISE_RADIUS);
+            else compute_lambda_p_radius(lambda, g_H_tmp2, m_upd, g_C[meas], MEAS_NOISE_RADIUS);
+
+            int m_next2 = 0;
+            strip_update_kernel(p_upd.data(), g_H_tmp2, m_upd, g_C[meas], y_k[meas], MEAS_NOISE_RADIUS, lambda, p_next2.data(), g_H_tmp3, &m_next2);
+            std::memcpy(p_upd.data(), p_next2.data(), sizeof(data_t) * N_STATE);
+            m_upd = m_next2;
+            std::memcpy(g_H_tmp2, g_H_tmp3, sizeof(g_H_tmp2));
+        }
+
+        g_X.m = m_upd; for (int i = 0; i < N_STATE; ++i) g_X.p[i] = p_upd[i];
+        std::memcpy(g_X.H, g_H_tmp2, sizeof(g_X.H));
+        zonotope_reduce(&g_X, REDUCTION_BUDGET);
+
+        dump_true_append(x_true_csv.c_str(), x_true.data());
+        dump_center_append(center_csv.c_str(), g_X.p);
+        data_t l2 = 0.0f;
+        for(int i=0; i<N_STATE; ++i){ err[i]=g_X.p[i]-x_true[i]; l2+=err[i]*err[i]; }
+        err[N_STATE]=std::sqrt(l2);
+        csv_append_row(error_csv, err.data(), N_STATE+1);
+        if (k % 50 == 0) std::printf("[%s] k=%d done (m=%d)\n", method_name, k, g_X.m);
+    }
+    auto t1 = std::chrono::high_resolution_clock::now();
+    total_us = (data_t)std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count() / 1000.0f;
+    data_t summary[3] = {total_us, total_us / NUM_STEPS, (data_t)NUM_STEPS};
+    data_t timing_row[3] = {total_us / NUM_STEPS, 0.0f, 0.0f};
+    csv_append_row(ktime_csv, timing_row, 3);
+    csv_append_row(ksum_csv, summary, 3);
+    std::printf("[%s] total=%.2fus (%d steps), avg=%.2fus/step\n",
+                method_name, (double)total_us, NUM_STEPS, (double)(total_us / NUM_STEPS));
 }
 
 int main() {
-    // 输出文件：程序开始先清空 // Output files: clear at program start
-    dump_reset_file("data/output/center.csv");
-    dump_reset_file("data/output/x_true.csv");
-
-    // --- 真实状态 x_true ---
-    double x_true[N_STATE] = {0.0};
-    x_true[0] = 1.0;
-    x_true[1] = 0.0;
-
-    // phi_vec：Python 里 phi = l1 norm of row of H_v
-    // H_v = diag(MEAS_NOISE_RADIUS) => phi_i = MEAS_NOISE_RADIUS
-    double phi_vec[N_MEAS];
-    for (int i = 0; i < N_MEAS; ++i) phi_vec[i] = MEAS_NOISE_RADIUS;
-
-    // --- 初始 Zonotope X ---
-    Zonotope X;
-    X.n = N_STATE;
-    X.m = N_STATE;
-    for (int i = 0; i < N_STATE; ++i) {
-        X.p[i] = (i == 0) ? 1.0 : 0.0;
-        for (int j = 0; j < MAX_GEN; ++j) X.H[i][j] = 0.0;
-        X.H[i][i] = INIT_RADIUS;
-    }
-
-    // --- 过程噪声 W: p_w=0, H_w=diag(PROC_NOISE_RADIUS) ---
-    double p_w[N_STATE] = {0};
-    double H_w[N_STATE][MAX_GEN] = {0};
-    for (int i = 0; i < N_STATE; ++i) H_w[i][i] = PROC_NOISE_RADIUS;
-
-    // 初始写一条（可选） // Write an initial record (optional)
-    dump_true_append("data/output/x_true.csv", x_true);
-    dump_center_append("data/output/center.csv", X.p);
-    dump_zonotope_csv(X, 0, "data/output");
-
-    for (int k = 0; k < NUM_STEPS; ++k) {
-        // -------- system matrices (对齐 Python system_matrices) --------
-        double theta = 0.05 * k * DT;
-        double cth = std::cos(theta);
-        double sth = std::sin(theta);
-
-        double A[N_STATE][N_STATE] = {
-            {cth, -1.5*sth, 0, 0},
-            {1.5*sth,  cth, 0, 0},
-            {0, 0, 1, 0},
-            {0, 0, 0, 1}
-        };
-
-        double C[N_MEAS][N_STATE] = {
-            {1, 0, 0, 0},
-            {0, 1, 0, 0}
-        };
-
-        // -------- TRUE SYSTEM --------
-        double w_k[N_STATE];
-        for (int i = 0; i < N_STATE; ++i) w_k[i] = uniform_noise(PROC_NOISE_RADIUS);
-
-        double x_next[N_STATE];
-        for (int i = 0; i < N_STATE; ++i) {
-            double tmp = 0.0;
-            for (int j = 0; j < N_STATE; ++j) tmp += A[i][j] * x_true[j];
-            x_next[i] = tmp + w_k[i];
-        }
-        for (int i = 0; i < N_STATE; ++i) x_true[i] = x_next[i];
-
-        // measurement y_k = C x_true + v
-        double y_k[N_MEAS];
-        for (int i = 0; i < N_MEAS; ++i) {
-            double v = uniform_noise(MEAS_NOISE_RADIUS);
-            double tmp = 0.0;
-            for (int j = 0; j < N_STATE; ++j) tmp += C[i][j] * x_true[j];
-            y_k[i] = tmp + v;
-        }
-
-        // -------- ESTIMATOR: Prediction --------
-        double p_pred[N_STATE];
-        double H_pred[N_STATE][MAX_GEN];
-        int m_pred = 0;
-
-        predict_kernel(
-            X.p, X.H, X.m,
-            A,
-            p_w,
-            H_w, N_STATE,
-            p_pred,
-            H_pred,
-            &m_pred
-        );
-
-        // -------- ESTIMATOR: Correction (strip 串联，严格对齐 Python) --------
-        double p_upd[N_STATE];
-        double H_upd[N_STATE][MAX_GEN];
-        int m_upd = m_pred;
-
-        for (int i = 0; i < N_STATE; ++i) p_upd[i] = p_pred[i];
-        for (int r = 0; r < N_STATE; ++r)
-            for (int c = 0; c < m_pred; ++c)
-                H_upd[r][c] = H_pred[r][c];
-
-        LambdaMethod method = LAMBDA_SEGMENT; 
-        // 你可以改成 LAMBDA_NONE/LAMBDA_SEGMENT/LAMBDA_VOLUME/LAMBDA_P_RADIUS
-
-        for (int meas = 0; meas < N_MEAS; ++meas) {
-            double lambda[N_STATE];
-            double phi = phi_vec[meas];
-
-            if (method == LAMBDA_NONE) {
-                for (int j = 0; j < N_STATE; ++j) lambda[j] = C[meas][j];
-            } else if (method == LAMBDA_SEGMENT) {
-                compute_lambda_segment(lambda, H_upd, m_upd, C[meas], phi);
-            } else if (method == LAMBDA_VOLUME) {
-                compute_lambda_volume(lambda, H_upd, m_upd, C[meas], phi);
-            } else { // LAMBDA_P_RADIUS
-                compute_lambda_p_radius(lambda, H_upd, m_upd, C[meas], phi);
-            }
-
-            double p_next2[N_STATE];
-            double H_next2[N_STATE][MAX_GEN];
-            int m_next2 = 0;
-
-            strip_update_kernel(
-                p_upd, H_upd, m_upd,
-                C[meas],
-                y_k[meas],
-                phi,
-                lambda,
-                p_next2,
-                H_next2,
-                &m_next2
-            );
-
-            // 写回，继续串联下一个 strip
-            for (int i = 0; i < N_STATE; ++i) p_upd[i] = p_next2[i];
-            for (int r = 0; r < N_STATE; ++r)
-                for (int c = 0; c < m_next2; ++c)
-                    H_upd[r][c] = H_next2[r][c];
-            m_upd = m_next2;
-        }
-
-        // -------- 写回 X --------
-        X.m = m_upd;
-        for (int i = 0; i < N_STATE; ++i) X.p[i] = p_upd[i];
-        for (int r = 0; r < N_STATE; ++r) {
-            for (int c = 0; c < m_upd; ++c) X.H[r][c] = H_upd[r][c];
-            for (int c = m_upd; c < MAX_GEN; ++c) X.H[r][c] = 0.0; // 清零 // Zero out
-        }
-
-        // -------- Reduction（对齐 Python：所有 strip 串联完后 reduce 一次）--------
-        zonotope_reduce(&X, REDUCTION_BUDGET);
-
-        std::printf("k=%d, center=[%.3f %.3f %.3f %.3f], m=%d\n",
-                    k, X.p[0], X.p[1], X.p[2], X.p[3], X.m);
-
-        // dump: 每步都写（append 一条 center/true + 一个 zonotope 文件）
-        dump_true_append("data/output/x_true.csv", x_true);
-        dump_center_append("data/output/center.csv", X.p);
-        dump_zonotope_csv(X, k+1, "data/output"); // k+1: 因为 step0 已经写过一次
-    }
-
+    mkdir_p("data/output/cpp");
+    run_one_method(LAMBDA_NONE, "LAMBDA_NONE", "data/output/cpp");
+    run_one_method(LAMBDA_SEGMENT, "LAMBDA_SEGMENT", "data/output/cpp");
+    run_one_method(LAMBDA_VOLUME, "LAMBDA_VOLUME", "data/output/cpp");
     return 0;
 }
-
-// #include <cstdio>
-// #include <cmath>
-// #include <vector>
-// #include <random>
-// #include <array>
-// #include <algorithm>
-
-// #include "../include/dump.hpp"
-// #include "../include/zonotope.hpp"
-// #include "../include/kernels.hpp"
-
-// // ---------------------------------------------------------
-// // 1. 随机数生成器 (解决 identifier undefined 报错)
-// // ---------------------------------------------------------
-// // 建议将 rng 定义为全局或静态，确保序列是连续的
-// std::mt19937 rng(42); 
-
-// double uniform_noise(double r) {
-//     // 产生 [-r, r] 之间的均匀分布
-//     std::uniform_real_distribution<double> dist(-r, r);
-//     return dist(rng);
-// }
-
-// int main() {
-//     std::vector<std::array<double, N_STATE>> estimated_center_hist;
-//     std::vector<std::array<double, N_STATE>> x_true_hist;
-
-//     // --- 初始化真实状态 x_true ---
-//     double x_true[N_STATE] = {0.0};
-//     x_true[0] = 1.0;
-//     x_true[1] = 0.0;
-
-//     double phi_vec[N_MEAS];
-//     for (int i = 0; i < N_MEAS; ++i) {
-//         phi_vec[i] = MEAS_NOISE_RADIUS;  // 因为 H_v = diag(radius)
-//     }
-
-//     Zonotope X;
-//     X.n = N_STATE;
-//     X.m = N_STATE;
-
-//     /* Initial zonotope */
-//     for (int i = 0; i < N_STATE; ++i) {
-//         X.p[i] = (i == 0) ? 1.0 : 0.0;
-//         for (int j = 0; j < N_STATE; ++j) {
-//             X.H[i][j] = (i == j) ? INIT_RADIUS : 0.0;
-//         }
-//     }
-
-//     /* Process noise */
-//     double p_w[N_STATE] = {0};
-//     double H_w[N_STATE][MAX_GEN] = {0};
-//     for (int i = 0; i < N_STATE; ++i)
-//         H_w[i][i] = PROC_NOISE_RADIUS;
-
-//     for (int k = 0; k < NUM_STEPS; ++k) {
-//         double theta = 0.05 * k * DT;
-//         double cth = std::cos(theta);
-//         double sth = std::sin(theta);
-
-//         double A[N_STATE][N_STATE] = {
-//             {cth, -1.5*sth, 0, 0},
-//             {1.5*sth,  cth, 0, 0},
-//             {0, 0, 1, 0},
-//             {0, 0, 0, 1}
-//         };
-
-//         double C[N_MEAS][N_STATE] = {
-//             {1, 0, 0, 0},
-//             {0, 1, 0, 0}
-//         };
-
-//         double p_pred[N_STATE];
-//         double H_pred[N_STATE][MAX_GEN];
-//         int m_pred;
-//         //真实系统更新 // True system update
-//         double w_k[N_STATE];
-//         for (int i = 0; i < N_STATE; ++i)
-//             w_k[i] = uniform_noise(PROC_NOISE_RADIUS);
-
-//         for (int i = 0; i < N_STATE; ++i) {
-//             double tmp = 0.0;
-//             for (int j = 0; j < N_STATE; ++j)
-//                 tmp += A[i][j] * x_true[j];
-//             x_true[i] = tmp + w_k[i];
-//         }
-
-//         //生成测量 y_k
-//         double y_k[N_MEAS];
-//         for (int i = 0; i < N_MEAS; ++i) {
-//             double v = uniform_noise(MEAS_NOISE_RADIUS);
-//             y_k[i] = 0.0;
-//             for (int j = 0; j < N_STATE; ++j)
-//                 y_k[i] += C[i][j] * x_true[j];
-//             y_k[i] += v;
-//         }
-
-
-
-//         /* Prediction */
-//         FpgaKernels::predict(
-//             X.p, X.H, X.m,
-//             A,
-//             p_w,
-//             H_w, N_STATE,
-//             p_pred,
-//             H_pred,
-//             &m_pred
-//         );
-        
-//         // 初始化为 prediction
-//         double p_upd[N_STATE];
-//         double H_upd[N_STATE][MAX_GEN];
-//         // 1. 拷贝中心点 p
-//         std::copy(p_pred, p_pred + N_STATE, p_upd);
-//         for (int i = 0; i < N_STATE; ++i) {
-//             for (int j = 0; j < m_pred; ++j)
-//                 H_upd[i][j] = H_pred[i][j];
-//         }
-//         // 3. 拷贝生成器数量 // 3. Copy generator count
-//         int m_upd = m_pred;
-  
-//         /* Measurement update 方法选择*/
-//         LambdaMethod method = LAMBDA_SEGMENT;  // 或 LAMBDA_SEGMENT / LAMBDA_NONE
-//         for (int i = 0; i < N_MEAS; ++i) {
-//             double lambda[N_STATE];
-//             double phi = phi_vec[i];
-
-//             if (method == LAMBDA_NONE) {
-//                 for (int j = 0; j < N_STATE; ++j)
-//                     lambda[j] = C[i][j];
-//             }
-//             else if (method == LAMBDA_SEGMENT) {
-//                 compute_lambda_segment(lambda, H_upd, m_upd, C[i], phi); // C[i]一个[]默认传入第i行
-//             }
-//             else if (method == LAMBDA_VOLUME) {
-//                 compute_lambda_volume(lambda, H_upd, m_upd, C[i], phi);
-//             }
-//             else if (method == LAMBDA_P_RADIUS) {
-//                 compute_lambda_p_radius(lambda, H_upd, m_upd, C[i], phi);
-//             }
-//             else
-//                 for (int j = 0; j < N_STATE; ++j) lambda[j] = C[i][j];
-                
-//             double p_next[N_STATE];
-//             double H_next[N_STATE][MAX_GEN];
-//             int m_next;
-
-//             FpgaKernels::strip_update(
-//                 p_upd,
-//                 H_upd,
-//                 m_upd,
-//                 C[i],
-//                 y_k[i],   // ★ 不再是 0
-//                 phi,      // ★ 不再是 MEAS_NOISE_RADIUS
-//                 lambda,
-//                 p_next,//X.p,
-//                 H_next,//X.H,
-//                 &m_next//&X.m
-//                 );
-
-//             // === 写回，准备下一个 strip ===
-//             std::copy(p_next, p_next + N_STATE, p_upd);
-//             for (int r = 0; r < N_STATE; ++r)
-//                 for (int c = 0; c < m_next; ++c)
-//                     H_upd[r][c] = H_next[r][c];
-//             m_upd = m_next;
-//         }
-        
-//         // === 最终写回 X ===
-//         X.m = m_upd;
-//         std::copy(p_upd, p_upd + N_STATE, X.p);
-//         for (int i = 0; i < N_STATE; ++i)
-//             for (int j = 0; j < m_upd; ++j)
-//                 X.H[i][j] = H_upd[i][j];
-
-//         // // 如果 H 之前更大，需要清零剩余列（推荐，防脏数据）
-//         // for (int i = 0; i < N_STATE; ++i) {
-//         //     for (int j = m_upd; j < MAX_GEN; ++j) {
-//         //         X.H[i][j] = 0.0;
-//         //     }
-//         // }
-
-//         // ===== Reduction (对应 Python X = X_upd.reduce) =====
-//         zonotope_reduce(&X, REDUCTION_BUDGET);
-
-
-
-//         std::printf("k=%d, center=[%.3f %.3f %.3f %.3f]\n",
-//                     k, X.p[0], X.p[1], X.p[2], X.p[3]);
-
-//         // 每一步更新后添加的代码 // Code added after each update step
-//         estimated_center_hist.push_back(
-//             {X.p[0], X.p[1], X.p[2], X.p[3]}
-//         );
-//         dump_zonotope_csv(X, k, "output");
-
-//         x_true_hist.push_back(
-//             {x_true[0], x_true[1], x_true[2], x_true[3]}
-//         );
-//         dump_centers_csv(x_true_hist, "output/x_true.csv");
-//     }
-//     // 仿真结束后导出中心轨迹 // Export center trajectory after simulation
-//     dump_centers_csv(estimated_center_hist, "output/center.csv");
-//     return 0;
-// }

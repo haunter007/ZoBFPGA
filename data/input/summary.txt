@@ -1,0 +1,30 @@
+kernel_mode: batch
+data_mode: real
+reload_policy: once
+n_runs: 20
+p_size: 24
+n_steps: 200
+effective_steps: 200
+n_meas: 12
+max_gens: 64
+m_history: [32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32]
+mean_all_ms: 3.1563
+total_ms: 3.1543
+ms_per_step: 0.015772
+cycles_per_step_at_166.000MHz: 2618.09
+mean_excl_first_ms: 3.1543
+std_ms: 0.0061
+min_ms: 3.1473
+max_ms: 3.1722
+p_output: [0.639999270439148, -1.1794859170913696, 1.4514055252075195, 0.3044865131378174, -0.8050057888031006, -0.5756953358650208, 1.0412172079086304, 0.3546558618545532, 0.7615249156951904, -1.061204195022583, 0.41565388441085815, 0.025493577122688293, -0.6041682958602905, -1.3018242120742798, 0.7989331483840942, 0.6403054594993591, -0.5905988812446594, -0.5096913576126099, 1.4746211767196655, 1.0698585510253906, 1.0284450054168701, -1.80051589012146, 1.8188560009002686, 0.9475888013839722]
+H_output_nonzero_cols: 30
+
+trace_center_shape: (200, 24)
+trace_x_true_shape: (200, 24)
+trace_error_shape: (200, 25)
+trace_x_true_available: True
+trace_error_png: /home/ubuntu/zonotope/data/output/real/error.png
+trace_x_true_source: /home/ubuntu/zonotope/data/input/x_true.npy
+trace_meas_shape: (200, 12)
+
+trace_step_m_history_shape: (200,)
