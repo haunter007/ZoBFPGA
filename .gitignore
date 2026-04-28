@@ -28,6 +28,20 @@ build/
 __pycache__/
 *.pyc
 
+# Local workspace files
+.codex
+.bashrc
+
+# Large/generated HLS outputs
+/data/output/hls/
+/data/output/HLS_Report*/
+/prj_zonotope/
+
+# Local compiled binaries
+/src/cpp/replay_fixed_input
+/src/cpp/zonotope_cpp
+/src/cpp/zonotope_cpp_200
+
 # General
 *.log
 *.jou

@@ -10,7 +10,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-TARGET_METHODS = ("LAMBDA_SEGMENT",)
+TARGET_METHODS = ("LAMBDA_NONE", "LAMBDA_SEGMENT", "LAMBDA_VOLUME")
 
 
 def _as_2d(a: np.ndarray) -> np.ndarray:

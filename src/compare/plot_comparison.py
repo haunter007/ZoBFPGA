@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-四版本对比脚本：Python / C++ / HLS cosim / SoC Board
-Four-way comparison: Python / C++ / HLS cosim / SoC Board (Kria KR260)
+三版本对比脚本：Python / C++ / SoC Board
+Three-way comparison: Python / C++ / SoC Board (Kria KR260)
 
 用法 / Usage:
     python3 src/compare/plot_comparison.py
 
 输出 / Output:
-    data/output/comparison/<METHOD>/trajectory.png   (Python/C++/HLS 三者轨迹)
-    data/output/comparison/<METHOD>/error.png        (Python/C++/HLS 三者误差)
-    data/output/comparison/timing/timing_bar.png     (四者总耗时柱状图)
-    data/output/comparison/timing/timing_table.png   (四者总耗时数值表格)
-    data/output/comparison/timing/timing_table.csv   (四者总耗时数值 CSV)
-    data/output/comparison/timing/timing_table.txt   (四者总耗时数值纯文本)
+    data/output/comparison/<METHOD>/trajectory.png   (Python/C++/Board 三者轨迹)
+    data/output/comparison/<METHOD>/error.png        (Python/C++/Board 三者误差)
+    data/output/comparison/timing/timing_bar.png     (三者总耗时柱状图)
+    data/output/comparison/timing/timing_table.png   (三者总耗时数值表格)
+    data/output/comparison/timing/timing_table.csv   (三者总耗时数值 CSV)
+    data/output/comparison/timing/timing_table.txt   (三者总耗时数值纯文本)
 """
 
 from pathlib import Path
@@ -28,7 +28,7 @@ import csv
 # =============================================================================
 
 # 当前只比较 segment 方法
-# Compare only the segment method for Python / C++ / HLS.
+# Compare only the segment method for Python / C++ / Board.
 COMPARE_METHODS = ["LAMBDA_SEGMENT"]
 
 # 轨迹/误差优先用 step 口径的 HLS 结果
@@ -43,8 +43,8 @@ HLS_TIMING_MODES = ["csim_batch", "cosim_batch", "csim", "cosim"]
 # Old board data is often from a different problem size, so exclude it by default
 INCLUDE_BOARD = True
 
-# 四个版本的标签和颜色
-# Labels and colors for all four implementations
+# 三个版本的标签和颜色
+# Labels and colors for all three implementations
 IMPL_LABEL  = {"python": "Python",   "cpp": "C++",     "hls": "HLS Sim", "board": "SoC Board"}
 IMPL_COLOR  = {"python": "tab:blue", "cpp": "tab:green","hls": "tab:orange","board": "tab:red"}
 IMPL_LS     = {"python": "--",       "cpp": "-.",       "hls": "-",         "board": ":"}
@@ -95,8 +95,8 @@ def _load_csv(path: Path) -> np.ndarray | None:
         return None
 
 def _get_dirs(method: str) -> dict:
-    """返回四个版本对应 method 的数据目录
-       Return data dirs for all four impls for the given method"""
+    """返回各版本对应 method 的数据目录
+       Return data dirs for all impls for the given method"""
     root = _repo_root() / "data" / "output"
     return {
         "python": root / "python" / method,
@@ -113,7 +113,7 @@ def _get_dirs(method: str) -> dict:
 def plot_trajectory(method: str, out_dir: Path):
     """轨迹对比图（x[0] vs x[1]）// Trajectory comparison (x[0] vs x[1])"""
     dirs = _get_dirs(method)
-    plot_impls = ["python", "cpp", "hls", "board"]
+    plot_impls = ["python", "cpp", "board"]
 
     fig, ax = plt.subplots(figsize=(7, 7))
 
@@ -144,7 +144,7 @@ def plot_trajectory(method: str, out_dir: Path):
     ax.set_aspect("equal")
     ax.set_xlabel("x[0]")
     ax.set_ylabel("x[1]")
-    ax.set_title(f"{method}: Trajectory Comparison (Python / C++ / HLS)")
+    ax.set_title(f"{method}: Trajectory Comparison (Python / C++ / SoC Board)")
     ax.grid(True, linestyle=":", alpha=0.5)
     ax.legend(loc="best", fontsize="small")
     fig.tight_layout()
@@ -155,7 +155,7 @@ def plot_trajectory(method: str, out_dir: Path):
 def plot_error(method: str, out_dir: Path):
     """误差曲线对比图 // Error norm comparison"""
     dirs = _get_dirs(method)
-    plot_impls = ["python", "cpp", "hls", "board"]
+    plot_impls = ["python", "cpp", "board"]
 
     fig, ax = plt.subplots(figsize=(8, 4))
 
@@ -236,9 +236,9 @@ def _load_timing_info(d: Path, impl: str = "") -> tuple[float | None, int | None
 
 
 def plot_timing(out_dir: Path):
-    """分组柱状图 + 数值表格（四版本）// Grouped bar chart + numeric table (4 impls)"""
+    """分组柱状图 + 数值表格（三版本）// Grouped bar chart + numeric table (3 impls)"""
     methods = COMPARE_METHODS
-    impls = ["python", "cpp", "hls"]
+    impls = ["python", "cpp"]
     if INCLUDE_BOARD:
         impls.append("board")
 
@@ -292,8 +292,8 @@ def plot_timing(out_dir: Path):
     ax.set_xticklabels([m.replace("LAMBDA_", "") for m in methods])
     ax.set_xlabel("Method")
     ax.set_ylabel("Total runtime (ms)  [log scale]")
-    title = "Total Runtime: Python vs C++ vs HLS Sim"
-    subtitle = "Only implementations with matching step counts are compared; HLS = batch csim if available"
+    title = "Total Runtime: Python vs C++"
+    subtitle = "Only implementations with matching step counts are compared"
     if INCLUDE_BOARD:
         title += " vs SoC Board"
         subtitle += "; Board = Kria KR260 measured"
@@ -307,12 +307,11 @@ def plot_timing(out_dir: Path):
     # ── 2. 数值表格图 // Numeric table figure ────────────────────────────────
     col_labels = ["Method", "Steps"] + [IMPL_LABEL[i] for i in impls]
     if INCLUDE_BOARD:
-        col_labels += ["Python/Board ×", "C++/Board ×", "HLS/Board ×"]
+        col_labels += ["Python/Board ×", "C++/Board ×"]
     rows = []
     for method in methods:
         t_py    = times[method]["python"]
         t_cpp   = times[method]["cpp"]
-        t_hls   = times[method]["hls"]
         t_board = times[method].get("board")
         cands = [c for c in counts[method].values() if c is not None]
         common_count = max(set(cands), key=cands.count) if cands else None
@@ -329,12 +328,12 @@ def plot_timing(out_dir: Path):
         row = [
             method.replace("LAMBDA_", ""),
             str(common_count) if common_count is not None else "N/A",
-            fmt(t_py, "python"), fmt(t_cpp, "cpp"), fmt(t_hls, "hls"),
+            fmt(t_py, "python"), fmt(t_cpp, "cpp"),
         ]
         if INCLUDE_BOARD:
             row += [
                 fmt(t_board, "board"),
-                ratio(t_py, t_board), ratio(t_cpp, t_board), ratio(t_hls, t_board),
+                ratio(t_py, t_board), ratio(t_cpp, t_board),
             ]
         rows.append(row)
 
@@ -358,8 +357,7 @@ def plot_timing(out_dir: Path):
 
     if INCLUDE_BOARD:
         table_title = ("Total Runtime Summary (ms)  —  Speedup relative to SoC Board\n"
-                       "HLS = batch testbench if available, else summed step testbench; Board = Kria KR260 measured; "
-                       "Python/C++ = host CPU wall-clock")
+                       "Board = Kria KR260 measured; Python/C++ = host CPU wall-clock")
     else:
         table_title = ("Total Runtime Summary (ms)\n"
                        "Only rows with matching step counts are compared; mismatched counts are marked N/A (<count>)")

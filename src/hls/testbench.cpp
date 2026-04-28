@@ -680,7 +680,7 @@ struct MethodItem {
 };
 
 static const MethodItem kMethods[] = {
-    {LAMBDA_SEGMENT, "LAMBDA_SEGMENT"},
+    {(LambdaMethod)HLS_LAMBDA_METHOD_ID, HLS_LAMBDA_METHOD_NAME},
 };
 
 static void run_one_method(LambdaMethod method, const char* method_name, const std::string& out_base_dir) {
@@ -1353,7 +1353,7 @@ int main() {
 
     if (!ran_any) {
         std::printf("No method matched HLS_LAMBDA_METHOD=%s\n", (only_method && only_method[0]) ? only_method : "(unset)");
-        std::printf("Valid: LAMBDA_SEGMENT\n");
+        std::printf("Valid: %s\n", HLS_LAMBDA_METHOD_NAME);
         return 2;
     }
 

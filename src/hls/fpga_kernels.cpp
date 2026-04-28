@@ -9,12 +9,14 @@ static constexpr int STATE_PAR = N_STATE;
 static constexpr int STATE_BLOCKS = N_STATE / STATE_PAR;
 static constexpr int OSC_BLOCK_SIZE = 4;
 static constexpr int OSC_BLOCKS = N_STATE / OSC_BLOCK_SIZE;
+static constexpr int SELECTED_LAMBDA_METHOD = HLS_LAMBDA_METHOD_ID;
 
 static inline int meas_state_index(int meas) {
 #pragma HLS INLINE
     return (meas / 2) * OSC_BLOCK_SIZE + (meas % 2);
 }
 
+#if HLS_LAMBDA_METHOD_ID == HLS_LAMBDA_METHOD_SEGMENT
 #define DEFINE_MEAS_UPDATE_FUNC(NAME, BASE, CIDX) \
 static inline void NAME( \
     data_t p_inout[N_STATE], \
@@ -98,6 +100,63 @@ static inline void NAME( \
     p_inout[(BASE) + 3] += lambda3 * r; H_inout[(BASE) + 3][m] = phi_meas * lambda3; \
     *m_inout = m + 1; \
 }
+#else
+#define DEFINE_MEAS_UPDATE_FUNC(NAME, BASE, CIDX) \
+static inline void NAME( \
+    data_t p_inout[N_STATE], \
+    data_t H_inout[N_STATE][MAX_GEN], \
+    int* m_inout, \
+    data_t y_val, \
+    data_t phi_meas \
+) { \
+    _Pragma("HLS INLINE") \
+    _Pragma("HLS ARRAY_PARTITION variable=p_inout complete dim=1") \
+    _Pragma("HLS ARRAY_PARTITION variable=H_inout complete dim=1") \
+    const int m = *m_inout; \
+    assert(m <= STEP_MEAS_MAX_GEN); \
+    const data_t residual = p_inout[CIDX]; \
+    const data_t r = y_val - residual; \
+    data_t t_sq_acc[4]; \
+    _Pragma("HLS ARRAY_PARTITION variable=t_sq_acc complete dim=1") \
+    for (int l = 0; l < 4; ++l) { \
+        _Pragma("HLS UNROLL") \
+        t_sq_acc[l] = 0.0f; \
+    } \
+    for (int j = 0; j < m; ++j) { \
+        _Pragma("HLS PIPELINE II=1") \
+        _Pragma("HLS LOOP_TRIPCOUNT min=0 max=STEP_MEAS_MAX_GEN") \
+        const int lane = j & 3; \
+        const data_t t = H_inout[CIDX][j]; \
+        t_sq_acc[lane] += t * t; \
+    } \
+    data_t t_sq = 0.0f; \
+    for (int l = 0; l < 4; ++l) { \
+        _Pragma("HLS UNROLL") \
+        t_sq += t_sq_acc[l]; \
+    } \
+    data_t lambda_diag = 0.0f; \
+    if (SELECTED_LAMBDA_METHOD == HLS_LAMBDA_METHOD_NONE) { \
+        lambda_diag = 1.0f; \
+    } else if (SELECTED_LAMBDA_METHOD == HLS_LAMBDA_METHOD_VOLUME) { \
+        const data_t denom = t_sq + phi_meas * phi_meas; \
+        if (denom >= 1e-12f) lambda_diag = t_sq / denom; \
+    } \
+    for (int j = 0; j < m; ++j) { \
+        _Pragma("HLS LOOP_TRIPCOUNT min=0 max=STEP_MEAS_MAX_GEN") \
+        _Pragma("HLS PIPELINE II=1") \
+        _Pragma("HLS DEPENDENCE variable=H_inout inter false") \
+        const data_t t = H_inout[CIDX][j]; \
+        H_inout[CIDX][j] -= lambda_diag * t; \
+    } \
+    for (int i = 0; i < N_STATE; ++i) { \
+        _Pragma("HLS UNROLL") \
+        H_inout[i][m] = 0.0f; \
+    } \
+    p_inout[CIDX] += lambda_diag * r; \
+    H_inout[CIDX][m] = phi_meas * lambda_diag; \
+    *m_inout = m + 1; \
+}
+#endif
 
 DEFINE_MEAS_UPDATE_FUNC(apply_meas_b0_s0, 0, 0)
 DEFINE_MEAS_UPDATE_FUNC(apply_meas_b0_s1, 0, 1)
@@ -298,6 +357,10 @@ void zonotope_step_kernel(
 #pragma HLS ARRAY_PARTITION variable=H_w     cyclic factor=STATE_PAR dim=1
 #pragma HLS ARRAY_PARTITION variable=y       complete dim=1
 #pragma HLS ARRAY_PARTITION variable=phi     complete dim=1
+    static_assert(HLS_LAMBDA_METHOD_ID == HLS_LAMBDA_METHOD_NONE ||
+                  HLS_LAMBDA_METHOD_ID == HLS_LAMBDA_METHOD_SEGMENT ||
+                  HLS_LAMBDA_METHOD_ID == HLS_LAMBDA_METHOD_VOLUME,
+                  "Unsupported compiled HLS lambda method");
 
     int m = *m_inout;
 

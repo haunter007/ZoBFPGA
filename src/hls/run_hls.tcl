@@ -269,7 +269,7 @@ proc patch_exported_axi_user_widths {proj top axi_user_width} {
   incr changed [patch_file_string_map $top_rtl $rtl_replacements]
   incr changed [patch_file_regsub $impl_component $xml_patterns]
   incr changed [patch_file_regsub $impl_xgui_tcl [list \
-    "set_property value \\[get_property value \\$\\{PARAM_VALUE\\.([A-Z0-9_]+USER_WIDTH)\\}\\] \\$\\{MODELPARAM_VALUE\\.\\1\\}" "set_property value [get_property value \${PARAM_VALUE.\\1}] \${MODELPARAM_VALUE.\\1}" \
+    {set_property value \[get_property value \$\{PARAM_VALUE\.([A-Z0-9_]+USER_WIDTH)\}\] \$\{MODELPARAM_VALUE\.\1\}} {set_property value [get_property value ${PARAM_VALUE.\1}] ${MODELPARAM_VALUE.\1}} \
   ]]
 
   file delete -force $repo_root

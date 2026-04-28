@@ -189,6 +189,8 @@ static void run_one_method(LambdaMethod method, const char* method_name, const s
 
 int main() {
     mkdir_p("data/output/cpp");
+    run_one_method(LAMBDA_NONE, "LAMBDA_NONE", "data/output/cpp");
     run_one_method(LAMBDA_SEGMENT, "LAMBDA_SEGMENT", "data/output/cpp");
+    run_one_method(LAMBDA_VOLUME, "LAMBDA_VOLUME", "data/output/cpp");
     return 0;
 }
