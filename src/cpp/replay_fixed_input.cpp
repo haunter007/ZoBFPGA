@@ -73,7 +73,7 @@ static void csv_append_row(const std::string& path, const data_t* x, int n) {
 
 int main(int argc, char** argv) {
     std::string bundle_dir = "data/output/board_inputs_rebuilt_max32";
-    std::string out_dir = "data/output/cpp_fixed/LAMBDA_SEGMENT";
+    std::string out_dir = "data/output/cpp/fixed/LAMBDA_SEGMENT";
     if (argc >= 2) bundle_dir = argv[1];
     if (argc >= 3) out_dir = argv[2];
 

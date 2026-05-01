@@ -90,7 +90,7 @@ def replay(bundle_dir: Path, out_dir: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Replay the fixed board input bundle with the Python estimator.")
     parser.add_argument("--bundle-dir", default="data/output/board_inputs_rebuilt_max32")
-    parser.add_argument("--out-dir", default="data/output/python_fixed/LAMBDA_SEGMENT")
+    parser.add_argument("--out-dir", default="data/output/python/fixed/LAMBDA_SEGMENT")
     args = parser.parse_args()
     replay(Path(args.bundle_dir), Path(args.out_dir))
 
