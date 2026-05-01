@@ -8,7 +8,23 @@ Python / C++ / Vitis HLS implementations of a zonotopic state estimator, plus sc
 - `src/cpp/`: native C++ implementation and runner.
 - `src/hls/`: Vitis HLS kernels, testbench, and FPGA-result plotting.
 - `src/compare/plot_comparison.py`: unified Python/C++/HLS comparison plots.
-- `data/output/`: generated outputs for Python, C++, HLS sim, board runs, and comparison figures.
+- `data/output/`: generated outputs for Python, C++, HLS sim, board runs, comparison figures, and board input bundles.
+
+Recommended `data/output/` layout:
+
+```text
+data/output/
+  hls/
+  python/
+  cpp/
+  comparison/
+  board_inputs_rebuilt_max32/
+```
+
+- `data/output/hls/`: HLS reports, `csim`, `cosim`, and board-side FPGA outputs.
+- `data/output/python/` and `data/output/cpp/`: baseline outputs by method; `fixed/` stores fixed-input replays.
+- `data/output/comparison/`: cross-implementation figures; `python_hls/` stores Python-vs-HLS analysis plots and `fixed/` stores fixed-input comparison figures.
+- `data/output/board_inputs_rebuilt_max32/`: rebuilt board input bundle used for replay/debug runs.
 
 ## Quick Start
 
@@ -60,3 +76,4 @@ make hls-csim-step
 - `data/output/comparison/LAMBDA_SEGMENT/{trajectory,error}.png`
 - `data/output/comparison/LAMBDA_VOLUME/{trajectory,error}.png`
 - `data/output/comparison/timing/{timing_bar,timing_table}.png`
+- `data/output/comparison/python_hls/*` for Python-vs-HLS analysis plots

@@ -55,7 +55,7 @@ REDUCTION_BUDGET = 32
 RANDOM_SEED = 42
 
 # Output partition for Python-vs-HLS comparison results
-OUTPUT_PARTITION = "python_hls_compare"
+OUTPUT_PARTITION = "comparison/python_hls"
 HLS_REF_MODE = "csim"              # csim/cosim/ (prefer current step_axi csim)
 HLS_REF_METHOD = "LAMBDA_SEGMENT"  # LAMBDA_P_RADIUS/LAMBDA_SEGMENT/LAMBDA_VOLUME/NONE
 ESTIMATION_METHOD = "segment"      # 'None', 'segment', 'p_radius', 'volume'
