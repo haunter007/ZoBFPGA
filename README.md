@@ -1,4 +1,4 @@
-# minkowski_fpga
+# Zonotope-based Observer on FPGA (ZoBFPGA)
 
 Python / C++ / Vitis HLS implementations of a zonotopic state estimator, plus scripts to compare trajectory, error, and total runtime across implementations.
 
