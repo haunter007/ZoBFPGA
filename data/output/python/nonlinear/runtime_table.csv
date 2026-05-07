@@ -1,0 +1,9 @@
+n_state,measurement_mode,method,reduction_budget,mean_step_time_us,total_time_us
+12,all_positions,fixed,12,284.20879,28420.879011
+12,all_positions,segment,12,302.0943,30209.430002
+12,every_second_position,fixed,12,200.38647,20038.647006
+12,every_second_position,segment,12,212.96798,21296.797982
+24,all_positions,fixed,24,471.16184,47116.184007
+24,all_positions,segment,24,549.4802,54948.019992
+24,every_second_position,fixed,24,332.61191,33261.191016
+24,every_second_position,segment,24,347.27948,34727.947987

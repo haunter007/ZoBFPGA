@@ -1,0 +1,14 @@
+n_state 12
+num_steps 100
+measurement_mode all_positions
+method fixed
+reduction_budget 12
+center_rmse 0.09625273
+max_center_error 0.15720894
+mean_interval_width 0.81846166
+max_interval_width 3.47099637
+containment_rate 1.00000000
+mean_generators 12.000
+max_generators 12
+mean_step_time_us 284.209
+total_time_us 28420.879

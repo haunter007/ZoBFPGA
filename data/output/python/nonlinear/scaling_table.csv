@@ -1,0 +1,9 @@
+n_state,measurement_mode,method,reduction_budget,mean_step_time_us,mean_generators,max_generators,mean_interval_width,containment_rate
+12,all_positions,fixed,12,284.20879,12.0,12,0.81846166,1.0
+12,all_positions,segment,12,302.0943,12.0,12,0.83306197,1.0
+12,every_second_position,fixed,12,200.38647,12.0,12,198.98610632,1.0
+12,every_second_position,segment,12,212.96798,12.0,12,199.08430457,1.0
+24,all_positions,fixed,24,471.16184,24.0,24,0.81909559,1.0
+24,all_positions,segment,24,549.4802,24.0,24,0.83371002,1.0
+24,every_second_position,fixed,24,332.61191,24.0,24,198.98977986,1.0
+24,every_second_position,segment,24,347.27948,24.0,24,199.08776442,1.0

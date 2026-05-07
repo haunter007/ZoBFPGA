@@ -1,0 +1,9 @@
+n_state,measurement_mode,method,reduction_budget,center_rmse,max_center_error,mean_interval_width,max_interval_width,containment_rate
+12,all_positions,fixed,12,0.09625273,0.15720894,0.81846166,3.47099637,1.0
+12,all_positions,segment,12,0.09260086,0.15377894,0.83306197,3.51525177,1.0
+12,every_second_position,fixed,12,0.14833792,0.25138893,198.98610632,2000.0,1.0
+12,every_second_position,segment,12,0.14738486,0.25137103,199.08430457,2000.0,1.0
+24,all_positions,fixed,24,0.15706272,0.25667178,0.81909559,3.47213204,1.0
+24,all_positions,segment,24,0.15256469,0.25267075,0.83371002,3.51627186,1.0
+24,every_second_position,fixed,24,0.18356425,0.30498807,198.98977986,2000.0,1.0
+24,every_second_position,segment,24,0.18191145,0.30474556,199.08776442,2000.0,1.0
