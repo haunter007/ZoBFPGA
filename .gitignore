@@ -35,6 +35,7 @@ __pycache__/
 # Large/generated HLS outputs
 /data/output/hls/
 /data/output/HLS_Report*/
+/data/output/python/nonlinear/
 /prj_zonotope/
 
 # Local compiled binaries
