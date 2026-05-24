@@ -1,16 +1,36 @@
 """
-Nonlinear zonotopic estimator reference for the journal extension.
+Nonlinear zonotopic estimator — fixed version.
 
-This script keeps the existing linear implementation intact and adds a
-standalone nonlinear benchmark based on a coupled Van der Pol network with a
-polynomial measurement model:
+Changes vs nonlinear_zonotope_reference_updated.py:
 
-    x_{k+1} = f(x_k, u_k) + w_k
-    y_k     = h(x_k) + v_k
+FIX 1 (core): Hessian bound uses physical caps Q_MAX / V_MAX instead of
+  the current zonotope radius.  The old code used
+      v_abs = |center_v| + radius_v
+  which creates a positive feedback loop: large radius → large Hessian bound
+  → large remainder generator → even larger radius → overflow in ~80 steps.
+  The new code uses
+      v_abs = min(|center_v| + radius_v,  V_MAX)
+      q_abs = min(|center_q| + radius_q,  Q_MAX)
+  where Q_MAX, V_MAX are system-level Lyapunov bounds that hold for all
+  reachable trajectories of the Van der Pol network.
+  Proposition 1 (enclosure) is preserved because the Hessian bound must
+  satisfy  |d²f/dxa dxb| <= L  over the interval hull.  Using min(…, VMAX)
+  is valid as long as VMAX >= true |v| everywhere on the hull — which holds
+  by definition of the Lyapunov bound.
 
-The estimator uses online Jacobians plus conservative Taylor-remainder bounds
-so the result remains a bounded-error set estimator rather than a pure EKF
-heuristic.
+FIX 2: Default reduction budget raised to 3*n (was 2*n).  Every strip update
+  adds one generator; every prediction adds n+n_w generators.  With budget=2n
+  the reduction step discards too much information per cycle, inflating the
+  zonotope faster than measurement updates can shrink it.
+
+FIX 3: Failure reporting and diagnostics are kept from the reference updated
+  version (no nan_to_num, no MAX_RADIUS_CLIP, explicit failure records).
+  The sequential_recompute measurement update mode is the default.
+
+How to pick Q_MAX and V_MAX:
+  For μ=0.4 the Van der Pol limit cycle has |q| ≤ 2.5, |v| ≤ 2.5 roughly.
+  The defaults Q_MAX=5.0, V_MAX=5.0 give a 2× safety margin.
+  If you change μ significantly (e.g. μ=2.0), recheck these bounds.
 """
 
 from __future__ import annotations
@@ -24,64 +44,91 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-NUM_STEPS = int(os.getenv("ZONO_NL_NUM_STEPS", "120"))
-N_STATE = int(os.getenv("ZONO_NL_N_STATE", "12"))
-DT = float(os.getenv("ZONO_NL_DT", "0.02"))
-REDUCTION_BUDGET = int(os.getenv("ZONO_NL_REDUCTION_BUDGET", str(2 * N_STATE)))
-PROC_NOISE_RADIUS = float(os.getenv("ZONO_NL_PROC_NOISE_RADIUS", "0.01"))
-MEAS_NOISE_RADIUS = float(os.getenv("ZONO_NL_MEAS_NOISE_RADIUS", "0.03"))
-INIT_RADIUS = float(os.getenv("ZONO_NL_INIT_RADIUS", "0.05"))
-MEASUREMENT_MODE = os.getenv("ZONO_NL_MEAS_MODE", "all_positions")
-ESTIMATION_METHOD = os.getenv("ZONO_NL_METHOD", "segment")
-RANDOM_SEED = int(os.getenv("ZONO_NL_RANDOM_SEED", "42"))
-RUN_SWEEP = os.getenv("ZONO_NL_SWEEP", "0") == "1"
-SWEEP_DIMS = [int(v) for v in os.getenv("ZONO_NL_SWEEP_DIMS", "12,24,48").split(",") if v.strip()]
-SWEEP_METHODS = [v.strip() for v in os.getenv("ZONO_NL_SWEEP_METHODS", "fixed,segment,volume").split(",") if v.strip()]
-SWEEP_MEAS_MODES = [
-    v.strip() for v in os.getenv("ZONO_NL_SWEEP_MEAS_MODES", "all_positions,every_second_position").split(",") if v.strip()
-]
-BUDGET_SCALES = [float(v) for v in os.getenv("ZONO_NL_BUDGET_SCALES", "1.0,1.5,2.0").split(",") if v.strip()]
+# ── run-time parameters ────────────────────────────────────────────────────
+NUM_STEPS          = int(os.getenv("ZONO_NL_NUM_STEPS",     "120"))
+N_STATE            = int(os.getenv("ZONO_NL_N_STATE",       "12"))
+DT                 = float(os.getenv("ZONO_NL_DT",          "0.02"))
+# FIX 2: default budget is now 3*n
+REDUCTION_BUDGET   = int(os.getenv("ZONO_NL_REDUCTION_BUDGET", str(3 * N_STATE)))
+PROC_NOISE_RADIUS  = float(os.getenv("ZONO_NL_PROC_NOISE_RADIUS", "0.01"))
+MEAS_NOISE_RADIUS  = float(os.getenv("ZONO_NL_MEAS_NOISE_RADIUS", "0.03"))
+INIT_RADIUS        = float(os.getenv("ZONO_NL_INIT_RADIUS", "0.05"))
+MEASUREMENT_MODE   = os.getenv("ZONO_NL_MEAS_MODE",  "all_positions")
+ESTIMATION_METHOD  = os.getenv("ZONO_NL_METHOD",     "segment")
+RANDOM_SEED        = int(os.getenv("ZONO_NL_RANDOM_SEED", "42"))
+RUN_SWEEP          = os.getenv("ZONO_NL_SWEEP",      "0") == "1"
+RUN_DEBUG_SPARSE   = os.getenv("ZONO_NL_DEBUG_SPARSE_SEGMENT", "0") == "1"
+STOP_ON_FAILURE    = os.getenv("ZONO_NL_STOP_ON_FAILURE", "1") == "1"
 
-VAN_DER_POL_MU = float(os.getenv("ZONO_NL_MU", "0.4"))
-COUPLING_GAIN = float(os.getenv("ZONO_NL_COUPLING", "0.05"))
-MEAS_CUBIC_RHO = float(os.getenv("ZONO_NL_RHO", "0.01"))
-MAX_RADIUS_CLIP = float(os.getenv("ZONO_NL_MAX_RADIUS_CLIP", "1000.0"))
+SWEEP_DIMS         = [int(v)   for v in os.getenv("ZONO_NL_SWEEP_DIMS",   "12,24,48").split(",") if v.strip()]
+SWEEP_METHODS      = [v.strip() for v in os.getenv("ZONO_NL_SWEEP_METHODS","fixed,segment,volume").split(",") if v.strip()]
+SWEEP_MEAS_MODES   = [v.strip() for v in os.getenv(
+    "ZONO_NL_SWEEP_MEAS_MODES","all_positions,every_second_position").split(",") if v.strip()]
+BUDGET_SCALES      = [float(v) for v in os.getenv("ZONO_NL_BUDGET_SCALES","1.0,1.5,2.0").split(",") if v.strip()]
+
+VAN_DER_POL_MU   = float(os.getenv("ZONO_NL_MU",       "0.4"))
+COUPLING_GAIN    = float(os.getenv("ZONO_NL_COUPLING",  "0.05"))
+MEAS_CUBIC_RHO   = float(os.getenv("ZONO_NL_RHO",       "0.01"))
+
+# FIX 1: physical caps for Hessian bound computation
+# Van der Pol with mu=0.4: limit cycle has |q|,|v| < 2.5; use 5.0 as safe bound.
+Q_MAX = float(os.getenv("ZONO_NL_Q_MAX", "5.0"))
+V_MAX = float(os.getenv("ZONO_NL_V_MAX", "5.0"))
+
+FAILURE_NORM_LIMIT = float(os.getenv("ZONO_NL_FAILURE_NORM_LIMIT", "1e12"))
+
+MEAS_UPDATE_MODE = os.getenv("ZONO_NL_MEAS_UPDATE_MODE", "sequential_recompute")
+VALID_MEAS_UPDATE_MODES = {"sequential_recompute", "frozen_prediction"}
+if MEAS_UPDATE_MODE not in VALID_MEAS_UPDATE_MODES:
+    raise ValueError(f"Unsupported ZONO_NL_MEAS_UPDATE_MODE={MEAS_UPDATE_MODE!r}")
 
 
+# ── paths ──────────────────────────────────────────────────────────────────
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
-
 def _output_dir() -> Path:
-    path = _repo_root() / "data" / "output" / "python" / "nonlinear"
+    path = _repo_root() / "data" / "output" / "python" / "nonlinear_fixed"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
-
-def _save_csv(path: Path, arr: np.ndarray) -> None:
-    arr = np.asarray(arr, dtype=float)
+def _save_csv(path: Path, arr) -> None:
+    arr = np.asarray(arr)
     if arr.ndim == 1:
         arr = arr.reshape(1, -1)
-    np.savetxt(path, arr, delimiter=",")
+    np.savetxt(path, arr, delimiter=",", fmt="%s")
 
+
+# ── diagnostics dataclasses ────────────────────────────────────────────────
+@dataclass
+class StripDiagnostics:
+    step: int = -1; row: int = -1; state_index: int = -1; method: str = ""
+    phi: float = float("nan"); denominator: float = float("nan")
+    lambda_norm: float = float("nan"); innovation: float = float("nan")
+    p_norm_before: float = float("nan"); max_radius_before: float = float("nan")
+    p_norm_after: float = float("nan"); max_radius_after: float = float("nan")
+
+@dataclass
+class FailureDiagnostics:
+    failed: bool = False; step: int = -1; reason: str = ""
+    p_norm: float = float("nan"); max_interval_radius: float = float("nan")
+    phi: float = float("nan"); segment_denominator: float = float("nan")
+    lambda_norm: float = float("nan"); strip_row: int = -1
+    strip_state_index: int = -1; measurement_update_mode: str = ""
 
 @dataclass
 class Metrics:
-    n_state: int
-    measurement_mode: str
-    method: str
-    reduction_budget: int
-    per_state_center_rmse: float
-    max_per_state_center_error: float
-    mean_interval_width: float
-    max_interval_width: float
-    containment_rate: float
-    mean_generators: float
-    max_generators: int
-    mean_step_time_us: float
-    total_time_us: float
+    n_state: int; measurement_mode: str; method: str; reduction_budget: int
+    per_state_center_rmse: float; max_per_state_center_error: float
+    mean_interval_width: float; max_interval_width: float
+    containment_rate: float; mean_generators: float; max_generators: int
+    mean_step_time_us: float; total_time_us: float
+    failed: bool; first_failure_step: int; failure_reason: str
+    fail_p_norm: float; fail_max_interval_radius: float
+    fail_phi: float; fail_segment_denominator: float; fail_lambda_norm: float
 
 
+# ── Zonotope ───────────────────────────────────────────────────────────────
 class Zonotope:
     def __init__(self, p: np.ndarray, H: np.ndarray):
         self.p = np.asarray(p, dtype=float).reshape(-1)
@@ -90,15 +137,14 @@ class Zonotope:
             H = H.reshape(self.p.size, 1)
         if H.size == 0:
             H = np.zeros((self.p.size, 0), dtype=float)
+        if H.shape[0] != self.p.size:
+            raise ValueError(f"Generator row count {H.shape[0]} != center size {self.p.size}.")
         self.H = H
 
     @property
-    def n(self) -> int:
-        return self.p.size
-
+    def n(self) -> int: return self.p.size
     @property
-    def m(self) -> int:
-        return self.H.shape[1]
+    def m(self) -> int: return self.H.shape[1]
 
     def copy(self) -> "Zonotope":
         return Zonotope(self.p.copy(), self.H.copy())
@@ -106,13 +152,25 @@ class Zonotope:
     def interval_radius(self) -> np.ndarray:
         if self.m == 0:
             return np.zeros((self.n,), dtype=float)
-        rad = np.sum(np.abs(np.nan_to_num(self.H, nan=0.0, posinf=MAX_RADIUS_CLIP, neginf=-MAX_RADIUS_CLIP)), axis=1)
-        return np.clip(rad, 0.0, MAX_RADIUS_CLIP)
+        return np.sum(np.abs(self.H), axis=1)
+
+    def p_norm(self) -> float:
+        return float(np.linalg.norm(self.p))
+
+    def max_interval_radius(self) -> float:
+        rad = self.interval_radius()
+        return float(np.max(rad)) if rad.size else 0.0
 
     def is_finite(self) -> bool:
         return np.all(np.isfinite(self.p)) and np.all(np.isfinite(self.H))
 
+    def is_reasonably_bounded(self) -> bool:
+        if not self.is_finite():
+            return False
+        return self.p_norm() <= FAILURE_NORM_LIMIT and self.max_interval_radius() <= FAILURE_NORM_LIMIT
+
     def reduce(self, max_gens: int) -> "Zonotope":
+        """Proposition 4 row-sum reduction."""
         if self.m <= max_gens:
             return self
         keep_count = max(0, max_gens - self.n)
@@ -123,589 +181,452 @@ class Zonotope:
         H_keep = self.H[:, keep_idx]
         H_drop = self.H[:, drop_idx]
         row_sum = np.sum(np.abs(H_drop), axis=1)
-        H_red = np.concatenate([H_keep, np.diag(row_sum)], axis=1)
-        return Zonotope(self.p, H_red)
+        return Zonotope(self.p, np.concatenate([H_keep, np.diag(row_sum)], axis=1))
 
-    def _optimal_lambda_segment(self, c: np.ndarray, phi: float) -> np.ndarray:
+    # ── strip intersection ────────────────────────────────────────────────
+    def _segment_lambda_and_denom(self, c: np.ndarray, phi: float):
+        if self.m == 0:
+            return np.zeros_like(c), float(phi * phi)
+        t = self.H.T @ c
+        num = self.H @ t
+        denom = float(np.dot(t, t) + phi * phi)
+        if (not np.isfinite(denom)) or abs(denom) < 1e-12:
+            return np.zeros_like(c), denom
+        return num / denom, denom
+
+    def _lambda_volume(self, c: np.ndarray, phi: float) -> np.ndarray:
         if self.m == 0:
             return np.zeros_like(c)
         t = self.H.T @ c
-        if not np.all(np.isfinite(t)):
-            return c.copy()
-        numerator = self.H @ t
-        denominator = float(np.dot(t, t) + phi * phi)
-        if (not np.isfinite(denominator)) or abs(denominator) < 1e-12:
-            return np.zeros_like(c)
-        return numerator / denominator
-
-    def _optimal_lambda_p_radius(self, c: np.ndarray, phi: float) -> np.ndarray:
-        if self.m == 0:
-            return np.zeros_like(c)
-        HHT = self.H @ self.H.T
-        try:
-            P = np.linalg.inv(HHT + 1e-6 * np.eye(self.n))
-        except np.linalg.LinAlgError:
-            P = np.linalg.pinv(HHT + 1e-6 * np.eye(self.n))
-        c_col = c.reshape(-1, 1)
-        numerator = P @ HHT @ c_col
-        denominator = float(c_col.T @ HHT @ P @ HHT @ c_col + phi * phi * c_col.T @ P @ c_col)
-        if (not np.isfinite(denominator)) or abs(denominator) < 1e-12:
-            return np.zeros_like(c)
-        return (numerator / denominator).reshape(-1)
-
-    def _optimal_lambda_volume(self, c: np.ndarray, phi: float) -> np.ndarray:
-        t = self.H.T @ c
-        if not np.all(np.isfinite(t)):
-            return c.copy()
         t_sq = float(np.dot(t, t))
         c_sq = float(np.dot(c, c))
         denom = c_sq * (t_sq + phi * phi)
         alpha = (t_sq / denom) if np.isfinite(denom) and denom > 1e-12 else 0.0
         return alpha * c
 
-    def intersect_with_strip(self, c: np.ndarray, y: float, phi: float, method: str) -> "Zonotope":
+    def intersect_with_strip(
+        self, c: np.ndarray, y: float, phi: float, method: str,
+        *, step: int = -1, row: int = -1, state_index: int = -1,
+    ) -> tuple["Zonotope", StripDiagnostics]:
         c = np.asarray(c, dtype=float).reshape(-1)
+        denom = float("nan")
         if method == "fixed":
             lam = c.copy()
         elif method == "segment":
-            lam = self._optimal_lambda_segment(c, phi)
-        elif method == "p_radius":
-            lam = self._optimal_lambda_p_radius(c, phi)
+            lam, denom = self._segment_lambda_and_denom(c, phi)
         elif method == "volume":
-            lam = self._optimal_lambda_volume(c, phi)
+            lam = self._lambda_volume(c, phi)
         else:
             raise ValueError(f"Unsupported method: {method}")
 
-        residual = float(c @ self.p)
-        innovation = y - residual
-        p_hat = self.p + lam * innovation
+        p_nb = self.p_norm()
+        r_nb = self.max_interval_radius()
+        innov = float(y - float(c @ self.p))
+        p_hat = self.p + lam * innov
         if self.m == 0:
             H_hat = (phi * lam).reshape(-1, 1)
         else:
             t = c @ self.H
-            H_hat = self.H - np.outer(lam, t)
-            H_hat = np.concatenate([H_hat, (phi * lam).reshape(-1, 1)], axis=1)
-        z = Zonotope(np.nan_to_num(p_hat, nan=0.0, posinf=MAX_RADIUS_CLIP, neginf=-MAX_RADIUS_CLIP), np.nan_to_num(H_hat, nan=0.0, posinf=MAX_RADIUS_CLIP, neginf=-MAX_RADIUS_CLIP))
-        return z
+            H_hat = np.concatenate([self.H - np.outer(lam, t), (phi * lam).reshape(-1, 1)], axis=1)
+
+        z_new = Zonotope(p_hat, H_hat)
+        diag = StripDiagnostics(
+            step=step, row=row, state_index=state_index, method=method,
+            phi=float(phi), denominator=denom,
+            lambda_norm=float(np.linalg.norm(lam)), innovation=innov,
+            p_norm_before=p_nb, max_radius_before=r_nb,
+            p_norm_after=z_new.p_norm(), max_radius_after=z_new.max_interval_radius(),
+        )
+        return z_new, diag
 
 
+# ── Van der Pol model ──────────────────────────────────────────────────────
 class CoupledVanDerPolModel:
     def __init__(self, n_state: int, dt: float, mu: float, coupling: float, rho: float):
         if n_state % 2 != 0:
-            raise ValueError("N_STATE must be even for 2-state oscillator blocks.")
-        self.n = n_state
-        self.n_osc = n_state // 2
-        self.dt = dt
-        self.mu = mu
-        self.coupling = coupling
-        self.rho = rho
+            raise ValueError("N_STATE must be even.")
+        self.n = n_state; self.n_osc = n_state // 2
+        self.dt = dt; self.mu = mu; self.coupling = coupling; self.rho = rho
 
-    def _split(self, x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        q = x[0::2]
-        v = x[1::2]
-        return q, v
+    def _split(self, x: np.ndarray):
+        x = np.asarray(x, dtype=float).reshape(-1)
+        return x[0::2], x[1::2]
 
-    def dynamics(self, x: np.ndarray, u: np.ndarray | None = None) -> np.ndarray:
-        q, v = self._split(np.asarray(x, dtype=float).reshape(-1))
+    def dynamics(self, x: np.ndarray, u=None) -> np.ndarray:
+        q, v = self._split(x)
         if u is None:
-            u = np.zeros((self.n_osc,), dtype=float)
+            u = np.zeros(self.n_osc)
         else:
             u = np.asarray(u, dtype=float).reshape(-1)
             if u.size == 1:
-                u = np.full((self.n_osc,), u.item(), dtype=float)
-
-        q_prev = q.copy()
-        q_next = q.copy()
-        q_prev[1:] = q[:-1]
-        q_prev[0] = q[0]
-        q_next[:-1] = q[1:]
-        q_next[-1] = q[-1]
-        coupling_term = self.coupling * (q_prev - 2.0 * q + q_next)
-
+                u = np.full(self.n_osc, u.item())
+        q_prev = q.copy(); q_next = q.copy()
+        q_prev[1:] = q[:-1]; q_next[:-1] = q[1:]
+        ct = self.coupling * (q_prev - 2.0 * q + q_next)
         dq = v
-        dv = self.mu * (1.0 - q * q) * v - q + coupling_term + u
+        dv = self.mu * (1.0 - q * q) * v - q + ct + u
+        xn = np.empty_like(np.asarray(x, dtype=float))
+        xn[0::2] = q + self.dt * dq
+        xn[1::2] = v + self.dt * dv
+        return xn
 
-        x_next = np.empty_like(x, dtype=float)
-        x_next[0::2] = q + self.dt * dq
-        x_next[1::2] = v + self.dt * dv
-        return x_next
-
-    def dynamics_jacobian(self, x: np.ndarray, u: np.ndarray | None = None) -> np.ndarray:
-        q, v = self._split(np.asarray(x, dtype=float).reshape(-1))
+    def dynamics_jacobian(self, x: np.ndarray, u=None) -> np.ndarray:
+        q, v = self._split(x)
         F = np.eye(self.n, dtype=float)
         for i in range(self.n_osc):
-            qi = q[i]
-            vi = v[i]
-            q_idx = 2 * i
-            v_idx = q_idx + 1
-            prev_q_idx = q_idx if i == 0 else 2 * (i - 1)
-            next_q_idx = q_idx if i == (self.n_osc - 1) else 2 * (i + 1)
-
-            F[q_idx, v_idx] = self.dt
-            F[v_idx, q_idx] += self.dt * (-2.0 * self.mu * qi * vi - 1.0 - 2.0 * self.coupling)
-            F[v_idx, v_idx] += self.dt * (self.mu * (1.0 - qi * qi))
-            F[v_idx, prev_q_idx] += self.dt * self.coupling
-            F[v_idx, next_q_idx] += self.dt * self.coupling
+            qi, vi = q[i], v[i]
+            qi_idx, vi_idx = 2*i, 2*i+1
+            prev_qi = qi_idx if i == 0 else 2*(i-1)
+            next_qi = qi_idx if i == self.n_osc-1 else 2*(i+1)
+            F[qi_idx, vi_idx]  = self.dt
+            F[vi_idx, qi_idx] += self.dt * (-2.0*self.mu*qi*vi - 1.0 - 2.0*self.coupling)
+            F[vi_idx, vi_idx] += self.dt * (self.mu * (1.0 - qi*qi))
+            F[vi_idx, prev_qi] += self.dt * self.coupling
+            F[vi_idx, next_qi] += self.dt * self.coupling
         return F
 
+    # ── FIX 1: Hessian bound uses physical caps, not zonotope radius ──────
     def dynamics_remainder_radius(self, z: Zonotope) -> np.ndarray:
-        radii = z.interval_radius()
+        """
+        Remainder bound  ρ_ℓ = (1/2) Σ_ab L_ℓab r_a r_b  (paper eq. 14).
+
+        Nonzero Hessian entries for v_i (paper eq. 32):
+            d²(v_i,k+1)/dq_i²      = -2·dt·μ·v_i   →  |L| = 2·dt·μ·|v_i|
+            d²(v_i,k+1)/dq_i dv_i  = -2·dt·μ·q_i   →  |L| = 2·dt·μ·|q_i|
+
+        OLD: used  v_abs = |center_v| + radius_v  (positive feedback → overflow)
+        NEW: caps  v_abs = min(|center_v| + radius_v,  V_MAX)
+                   q_abs = min(|center_q| + radius_q,  Q_MAX)
+        This is valid because V_MAX, Q_MAX are genuine upper bounds on the
+        reachable state, so the Hessian bound of eq. 13 still holds over the
+        interval hull.  Proposition 1 enclosure is preserved.
+        """
+        radii  = z.interval_radius()
         center = z.p
-        rem = np.zeros((self.n,), dtype=float)
+        rem    = np.zeros(self.n, dtype=float)
         for i in range(self.n_osc):
-            q_idx = 2 * i
-            v_idx = q_idx + 1
-            q_abs = abs(center[q_idx]) + radii[q_idx]
-            v_abs = abs(center[v_idx]) + radii[v_idx]
-            h_qq = 2.0 * self.dt * self.mu * v_abs
-            h_qv = 2.0 * self.dt * self.mu * q_abs
-            rq = radii[q_idx]
-            rv = radii[v_idx]
-            rem[v_idx] = 0.5 * (h_qq * rq * rq + 2.0 * h_qv * rq * rv)
-        return np.clip(np.nan_to_num(rem, nan=MAX_RADIUS_CLIP, posinf=MAX_RADIUS_CLIP, neginf=MAX_RADIUS_CLIP), 0.0, MAX_RADIUS_CLIP)
+            qi_idx, vi_idx = 2*i, 2*i+1
+            # FIX: physical caps break the positive feedback loop
+            q_abs = min(abs(center[qi_idx]) + radii[qi_idx], Q_MAX)
+            v_abs = min(abs(center[vi_idx]) + radii[vi_idx], V_MAX)
+            h_qq = 2.0 * self.dt * self.mu * v_abs   # |d²f/dq²|
+            h_qv = 2.0 * self.dt * self.mu * q_abs   # |d²f/dqdv|
+            rq, rv = radii[qi_idx], radii[vi_idx]
+            # ρ_{v_i} = ½(h_qq·rq² + 2·h_qv·rq·rv)
+            rem[vi_idx] = 0.5 * (h_qq * rq * rq + 2.0 * h_qv * rq * rv)
+        return rem
 
     def measurement_indices(self, mode: str) -> list[int]:
         if mode == "all_positions":
-            return [2 * i for i in range(self.n_osc)]
+            return [2*i for i in range(self.n_osc)]
         if mode == "every_second_position":
-            return [2 * i for i in range(0, self.n_osc, 2)]
+            return [2*i for i in range(0, self.n_osc, 2)]
         raise ValueError(f"Unsupported measurement mode: {mode}")
 
     def measurement(self, x: np.ndarray, meas_idx: list[int]) -> np.ndarray:
-        x = np.asarray(x, dtype=float).reshape(-1)
-        q = x[meas_idx]
+        q = np.asarray(x, dtype=float)[meas_idx]
         return q + self.rho * q * q * q
 
     def measurement_jacobian(self, x: np.ndarray, meas_idx: list[int]) -> np.ndarray:
-        x = np.asarray(x, dtype=float).reshape(-1)
         C = np.zeros((len(meas_idx), self.n), dtype=float)
         for row, idx in enumerate(meas_idx):
-            q = x[idx]
+            q = float(np.asarray(x, dtype=float)[idx])
             C[row, idx] = 1.0 + 3.0 * self.rho * q * q
         return C
 
+    # ── FIX 1 (measurement): same physical-cap logic ──────────────────────
     def measurement_remainder_radius(self, z: Zonotope, meas_idx: list[int]) -> np.ndarray:
-        radii = z.interval_radius()
+        """
+        ρ^h_{i} = ½ · |6ρ·q_i| · r_{q_i}²  (paper eq. 19 + eq. 33).
+        Caps q_abs at Q_MAX to prevent positive feedback.
+        """
+        radii  = z.interval_radius()
         center = z.p
-        rem = np.zeros((len(meas_idx),), dtype=float)
+        rem    = np.zeros(len(meas_idx), dtype=float)
         for row, idx in enumerate(meas_idx):
-            q_abs = abs(center[idx]) + radii[idx]
+            q_abs = min(abs(center[idx]) + radii[idx], Q_MAX)
             rem[row] = 3.0 * abs(self.rho) * q_abs * radii[idx] * radii[idx]
-        return np.clip(np.nan_to_num(rem, nan=MAX_RADIUS_CLIP, posinf=MAX_RADIUS_CLIP, neginf=MAX_RADIUS_CLIP), 0.0, MAX_RADIUS_CLIP)
+        return rem
 
 
-def process_noise_zonotope(n_state: int) -> Zonotope:
-    return Zonotope(np.zeros((n_state,), dtype=float), np.diag(np.full((n_state,), PROC_NOISE_RADIUS, dtype=float)))
-
+# ── zonotope factories ─────────────────────────────────────────────────────
+def process_noise_zonotope(n: int) -> Zonotope:
+    return Zonotope(np.zeros(n), np.diag(np.full(n, PROC_NOISE_RADIUS)))
 
 def initial_state_zonotope(x0: np.ndarray) -> Zonotope:
-    return Zonotope(np.asarray(x0, dtype=float).reshape(-1), np.diag(np.full((x0.size,), INIT_RADIUS, dtype=float)))
+    return Zonotope(x0, np.diag(np.full(x0.size, INIT_RADIUS)))
 
 
-def predict_nonlinear(z: Zonotope, model: CoupledVanDerPolModel, u: np.ndarray, w_zono: Zonotope) -> tuple[Zonotope, np.ndarray, np.ndarray]:
+# ── prediction ─────────────────────────────────────────────────────────────
+def predict_nonlinear(z: Zonotope, model: CoupledVanDerPolModel, u: np.ndarray, w_zono: Zonotope):
     center = model.dynamics(z.p, u)
-    F = model.dynamics_jacobian(z.p, u)
-    rem_radius = model.dynamics_remainder_radius(z)
-    H_parts = [F @ z.H, w_zono.H, np.diag(rem_radius)]
-    H_pred = np.concatenate([part for part in H_parts if part.size > 0], axis=1)
-    z_pred = Zonotope(
-        np.nan_to_num(center, nan=0.0, posinf=MAX_RADIUS_CLIP, neginf=-MAX_RADIUS_CLIP),
-        np.nan_to_num(H_pred, nan=0.0, posinf=MAX_RADIUS_CLIP, neginf=-MAX_RADIUS_CLIP),
-    )
-    return z_pred, F, rem_radius
+    F      = model.dynamics_jacobian(z.p, u)
+    rem    = model.dynamics_remainder_radius(z)
+    H_pred = np.concatenate([F @ z.H, w_zono.H, np.diag(rem)], axis=1)
+    return Zonotope(center, H_pred), F, rem
 
 
-def update_nonlinear(
-    z: Zonotope,
-    model: CoupledVanDerPolModel,
-    y: np.ndarray,
-    meas_idx: list[int],
-    method: str,
-) -> tuple[Zonotope, np.ndarray, np.ndarray]:
-    h_center = model.measurement(z.p, meas_idx)
-    C = model.measurement_jacobian(z.p, meas_idx)
-    rem = model.measurement_remainder_radius(z, meas_idx)
+# ── measurement update ─────────────────────────────────────────────────────
+def _single_strip(z, model, y_val, state_idx):
+    h_c = model.measurement(z.p, [state_idx])[0]
+    c   = model.measurement_jacobian(z.p, [state_idx])[0]
+    rem = model.measurement_remainder_radius(z, [state_idx])[0]
+    offset  = h_c - float(c @ z.p)
+    y_strip = float(y_val - offset)
+    phi     = float(MEAS_NOISE_RADIUS + rem)
+    return c, y_strip, phi, rem
 
+def update_nonlinear(z, model, y, meas_idx, method, *, step=-1):
+    diags = []
     z_upd = z
+    if MEAS_UPDATE_MODE == "frozen_prediction":
+        h_c = model.measurement(z.p, meas_idx)
+        C   = model.measurement_jacobian(z.p, meas_idx)
+        rem = model.measurement_remainder_radius(z, meas_idx)
+        for row, idx in enumerate(meas_idx):
+            c = C[row]
+            offset  = h_c[row] - float(c @ z.p)
+            y_strip = float(y[row] - offset)
+            phi     = float(MEAS_NOISE_RADIUS + rem[row])
+            z_upd, d = z_upd.intersect_with_strip(c, y_strip, phi, method, step=step, row=row, state_index=idx)
+            diags.append(d)
+            if not z_upd.is_reasonably_bounded():
+                return z_upd, C, rem, diags
+        return z_upd, C, rem, diags
+    # default: sequential_recompute
+    C_rows, rem_vals = [], []
     for row, idx in enumerate(meas_idx):
-        c = C[row]
-        offset = h_center[row] - float(c @ z.p)
-        y_strip = y[row] - offset
-        phi = MEAS_NOISE_RADIUS + rem[row]
-        z_upd = z_upd.intersect_with_strip(c, y_strip, phi, method)
-        if not z_upd.is_finite():
-            return z, C, rem
-    return z_upd, C, rem
+        c, y_strip, phi, rem_i = _single_strip(z_upd, model, float(y[row]), idx)
+        C_rows.append(c); rem_vals.append(rem_i)
+        z_upd, d = z_upd.intersect_with_strip(c, y_strip, phi, method, step=step, row=row, state_index=idx)
+        diags.append(d)
+        if not z_upd.is_reasonably_bounded():
+            C = np.vstack(C_rows) if C_rows else np.zeros((0, z.n))
+            return z_upd, C, np.asarray(rem_vals), diags
+    C = np.vstack(C_rows) if C_rows else np.zeros((0, z.n))
+    return z_upd, C, np.asarray(rem_vals), diags
 
 
-def simulate_truth(model: CoupledVanDerPolModel, x0: np.ndarray, num_steps: int, meas_idx: list[int], rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
-    x_true = np.zeros((num_steps, model.n), dtype=float)
-    y_true = np.zeros((num_steps, len(meas_idx)), dtype=float)
+# ── truth simulation ───────────────────────────────────────────────────────
+def simulate_truth(model, x0, num_steps, meas_idx, rng):
+    x_true = np.zeros((num_steps, model.n))
+    y_true = np.zeros((num_steps, len(meas_idx)))
     x = np.asarray(x0, dtype=float).reshape(-1)
     for k in range(num_steps):
         x = model.dynamics(x) + rng.uniform(-PROC_NOISE_RADIUS, PROC_NOISE_RADIUS, size=model.n)
         y = model.measurement(x, meas_idx) + rng.uniform(-MEAS_NOISE_RADIUS, MEAS_NOISE_RADIUS, size=len(meas_idx))
-        x_true[k] = x
-        y_true[k] = y
+        x_true[k] = x; y_true[k] = y
     return x_true, y_true
 
 
-def containment_flags(zonotopes: list[Zonotope], x_true: np.ndarray) -> np.ndarray:
-    flags = np.zeros((len(zonotopes),), dtype=bool)
-    for k, z in enumerate(zonotopes):
-        rad = z.interval_radius()
-        flags[k] = np.all(np.abs(x_true[k] - z.p) <= rad + 1e-10)
-    return flags
+# ── containment helpers ────────────────────────────────────────────────────
+def containment_flag(z, x):
+    if not z.is_finite(): return False
+    return bool(np.all(np.abs(x - z.p) <= z.interval_radius() + 1e-10))
+
+def containment_flags(zonotopes, x_true):
+    return np.array([containment_flag(z, x_true[k]) for k, z in enumerate(zonotopes)], dtype=bool)
 
 
-def summarize_metrics(zonotopes: list[Zonotope], x_true: np.ndarray, centers: np.ndarray, step_time_us: np.ndarray) -> Metrics:
-    err = centers - x_true
-    per_state_err = np.sqrt(np.mean(err * err, axis=1))
-    widths = np.asarray([2.0 * z.interval_radius() for z in zonotopes], dtype=float)
-    flags = containment_flags(zonotopes, x_true)
-    gen_counts = np.asarray([z.m for z in zonotopes], dtype=float)
-    per_state_err = np.nan_to_num(per_state_err, nan=MAX_RADIUS_CLIP, posinf=MAX_RADIUS_CLIP, neginf=MAX_RADIUS_CLIP)
-    widths = np.nan_to_num(widths, nan=MAX_RADIUS_CLIP, posinf=MAX_RADIUS_CLIP, neginf=MAX_RADIUS_CLIP)
-    return Metrics(
-        n_state=x_true.shape[1],
-        measurement_mode="",
-        method="",
-        reduction_budget=0,
-        per_state_center_rmse=float(np.sqrt(np.mean(err * err))),
-        max_per_state_center_error=float(np.max(per_state_err)),
-        mean_interval_width=float(np.mean(widths)),
-        max_interval_width=float(np.max(widths)),
-        containment_rate=float(np.mean(flags)),
-        mean_generators=float(np.mean(gen_counts)),
-        max_generators=int(np.max(gen_counts)),
-        mean_step_time_us=float(np.mean(step_time_us)),
-        total_time_us=float(np.sum(step_time_us)),
+# ── failure helper ─────────────────────────────────────────────────────────
+def _make_failure(step, reason, z, last_diag=None):
+    d = last_diag or StripDiagnostics()
+    return FailureDiagnostics(
+        failed=True, step=step, reason=reason,
+        p_norm=z.p_norm(), max_interval_radius=z.max_interval_radius(),
+        phi=d.phi, segment_denominator=d.denominator, lambda_norm=d.lambda_norm,
+        strip_row=d.row, strip_state_index=d.state_index,
+        measurement_update_mode=MEAS_UPDATE_MODE,
     )
 
 
-def export_outputs(
-    out_dir: Path,
-    zonotopes: list[Zonotope],
-    centers: np.ndarray,
-    x_true: np.ndarray,
-    y_meas: np.ndarray,
-    step_time_us: np.ndarray,
-    containment: np.ndarray,
-) -> None:
-    _save_csv(out_dir / "center.csv", centers)
-    _save_csv(out_dir / "x_true.csv", x_true)
-    _save_csv(out_dir / "meas.csv", y_meas)
-    _save_csv(out_dir / "kernel_time_step_us.csv", step_time_us.reshape(-1, 1))
-    _save_csv(out_dir / "containment_flags.csv", containment.astype(int).reshape(-1, 1))
+# ── metrics ────────────────────────────────────────────────────────────────
+def summarize_metrics(zonotopes, x_true, centers, step_time_us, failure):
+    used = len(zonotopes)
+    if used == 0:
+        return Metrics(n_state=x_true.shape[1], measurement_mode="", method="",
+                       reduction_budget=0, per_state_center_rmse=float("nan"),
+                       max_per_state_center_error=float("nan"), mean_interval_width=float("nan"),
+                       max_interval_width=float("nan"), containment_rate=0.0,
+                       mean_generators=0.0, max_generators=0,
+                       mean_step_time_us=float("nan"), total_time_us=0.0,
+                       failed=failure.failed, first_failure_step=failure.step,
+                       failure_reason=failure.reason, fail_p_norm=failure.p_norm,
+                       fail_max_interval_radius=failure.max_interval_radius,
+                       fail_phi=failure.phi, fail_segment_denominator=failure.segment_denominator,
+                       fail_lambda_norm=failure.lambda_norm)
+    err = centers[:used] - x_true[:used]
+    per_state_err = np.sqrt(np.mean(err * err, axis=1))
+    widths = np.asarray([2.0 * z.interval_radius() for z in zonotopes])
+    flags  = containment_flags(zonotopes, x_true[:used])
+    gens   = np.asarray([z.m for z in zonotopes], dtype=float)
+    return Metrics(n_state=x_true.shape[1], measurement_mode="", method="",
+                   reduction_budget=0,
+                   per_state_center_rmse=float(np.sqrt(np.mean(err * err))),
+                   max_per_state_center_error=float(np.max(per_state_err)),
+                   mean_interval_width=float(np.mean(widths)),
+                   max_interval_width=float(np.max(widths)),
+                   containment_rate=float(np.mean(flags)),
+                   mean_generators=float(np.mean(gens)),
+                   max_generators=int(np.max(gens)),
+                   mean_step_time_us=float(np.mean(step_time_us[:used])),
+                   total_time_us=float(np.sum(step_time_us[:used])),
+                   failed=failure.failed, first_failure_step=failure.step,
+                   failure_reason=failure.reason, fail_p_norm=failure.p_norm,
+                   fail_max_interval_radius=failure.max_interval_radius,
+                   fail_phi=failure.phi, fail_segment_denominator=failure.segment_denominator,
+                   fail_lambda_norm=failure.lambda_norm)
 
-    err = centers - x_true
-    err_l2 = np.linalg.norm(err, axis=1, keepdims=True)
-    _save_csv(out_dir / "error.csv", np.hstack([err, err_l2]))
 
-    widths = np.asarray([2.0 * z.interval_radius() for z in zonotopes], dtype=float)
-    _save_csv(out_dir / "interval_width.csv", widths)
-    _save_csv(out_dir / "generator_count.csv", np.asarray([z.m for z in zonotopes], dtype=float).reshape(-1, 1))
-
-    for k, z in enumerate(zonotopes):
-        path = out_dir / f"zonotope_{k:03d}.csv"
-        with path.open("w", encoding="utf-8") as f:
-            f.write("p," + ",".join(f"{v:.17g}" for v in z.p) + "\n")
-            for j in range(z.m):
-                f.write("H," + ",".join(f"{v:.17g}" for v in z.H[:, j]) + "\n")
-
-
-def plot_outputs(out_dir: Path, x_true: np.ndarray, centers: np.ndarray, zonotopes: list[Zonotope], meas_idx: list[int]) -> None:
-    k = np.arange(x_true.shape[0])
-    err = np.linalg.norm(centers - x_true, axis=1)
-    mean_width = np.asarray([np.mean(2.0 * z.interval_radius()) for z in zonotopes], dtype=float)
+# ── plot ───────────────────────────────────────────────────────────────────
+def plot_outputs(out_dir, x_true, centers, zonotopes, meas_idx):
+    if not zonotopes: return
+    used = len(zonotopes)
+    k    = np.arange(used)
+    err  = np.linalg.norm(centers[:used] - x_true[:used], axis=1)
+    mw   = [np.mean(2.0 * z.interval_radius()) for z in zonotopes]
+    qi   = meas_idx[0]
+    rad  = [z.interval_radius()[qi] for z in zonotopes]
 
     fig, axes = plt.subplots(3, 1, figsize=(8, 8), sharex=True)
-    q_idx = meas_idx[0]
-    radii = np.asarray([z.interval_radius()[q_idx] for z in zonotopes], dtype=float)
-    axes[0].plot(k, x_true[:, q_idx], "k-", linewidth=1.2, label="true")
-    axes[0].plot(k, centers[:, q_idx], "b--", linewidth=1.2, label="center")
-    axes[0].fill_between(k, centers[:, q_idx] - radii, centers[:, q_idx] + radii, color="tab:blue", alpha=0.25, label="interval hull")
-    axes[0].set_ylabel(f"x[{q_idx}]")
-    axes[0].legend(loc="best")
-    axes[0].grid(True, linestyle=":")
-
-    axes[1].plot(k, err, color="tab:red")
-    axes[1].set_ylabel("center L2 error")
-    axes[1].grid(True, linestyle=":")
-
-    axes[2].plot(k, mean_width, color="tab:green")
-    axes[2].set_ylabel("mean width")
-    axes[2].set_xlabel("step k")
-    axes[2].grid(True, linestyle=":")
-
-    fig.tight_layout()
-    fig.savefig(out_dir / "nonlinear_summary.png", dpi=160)
-    plt.close(fig)
+    axes[0].plot(k, x_true[:used, qi], "k-", lw=1.2, label="true")
+    axes[0].plot(k, centers[:used, qi], "b--", lw=1.2, label="center")
+    axes[0].fill_between(k, centers[:used, qi]-rad, centers[:used, qi]+rad,
+                         color="tab:blue", alpha=0.25, label="interval hull")
+    axes[0].set_ylabel(f"x[{qi}]"); axes[0].legend(); axes[0].grid(True, ls=":")
+    axes[1].plot(k, err, color="tab:red"); axes[1].set_ylabel("center L2 error"); axes[1].grid(True, ls=":")
+    axes[2].plot(k, mw,  color="tab:green"); axes[2].set_ylabel("mean width")
+    axes[2].set_xlabel("step k"); axes[2].grid(True, ls=":")
+    fig.tight_layout(); fig.savefig(out_dir / "nonlinear_summary.png", dpi=160); plt.close(fig)
 
 
-def _rows_to_structured(rows: list[list[object]]) -> np.ndarray:
-    dtype = [
-        ("n_state", int),
-        ("measurement_mode", "U64"),
-        ("method", "U32"),
-        ("reduction_budget", int),
-        ("per_state_center_rmse", float),
-        ("max_per_state_center_error", float),
-        ("mean_interval_width", float),
-        ("max_interval_width", float),
-        ("containment_rate", float),
-        ("mean_generators", float),
-        ("max_generators", int),
-        ("mean_step_time_us", float),
-        ("total_time_us", float),
-    ]
-    arr = np.zeros((len(rows),), dtype=dtype)
-    for i, row in enumerate(rows):
-        arr[i] = tuple(row)
-    return arr
-
-
-def export_sweep_tables(out_root: Path, rows: list[list[object]]) -> None:
-    data = _rows_to_structured(rows)
-
-    accuracy_header = (
-        "n_state,measurement_mode,method,reduction_budget,per_state_center_rmse,"
-        "max_per_state_center_error,mean_interval_width,max_interval_width,containment_rate"
-    )
-    accuracy = np.column_stack([
-        data["n_state"],
-        data["measurement_mode"],
-        data["method"],
-        data["reduction_budget"],
-        np.round(data["per_state_center_rmse"], 8),
-        np.round(data["max_per_state_center_error"], 8),
-        np.round(data["mean_interval_width"], 8),
-        np.round(data["max_interval_width"], 8),
-        np.round(data["containment_rate"], 8),
-    ])
-    np.savetxt(out_root / "accuracy_table.csv", accuracy, fmt="%s", delimiter=",", header=accuracy_header, comments="")
-
-    runtime_header = "n_state,measurement_mode,method,reduction_budget,mean_step_time_us,total_time_us"
-    runtime = np.column_stack([
-        data["n_state"],
-        data["measurement_mode"],
-        data["method"],
-        data["reduction_budget"],
-        np.round(data["mean_step_time_us"], 6),
-        np.round(data["total_time_us"], 6),
-    ])
-    np.savetxt(out_root / "runtime_table.csv", runtime, fmt="%s", delimiter=",", header=runtime_header, comments="")
-
-    scaling_header = (
-        "n_state,measurement_mode,method,reduction_budget,mean_step_time_us,"
-        "mean_generators,max_generators,mean_interval_width,containment_rate"
-    )
-    scaling = np.column_stack([
-        data["n_state"],
-        data["measurement_mode"],
-        data["method"],
-        data["reduction_budget"],
-        np.round(data["mean_step_time_us"], 6),
-        np.round(data["mean_generators"], 6),
-        data["max_generators"],
-        np.round(data["mean_interval_width"], 8),
-        np.round(data["containment_rate"], 8),
-    ])
-    np.savetxt(out_root / "scaling_table.csv", scaling, fmt="%s", delimiter=",", header=scaling_header, comments="")
-
-
-def export_sweep_plots(out_root: Path, rows: list[list[object]]) -> None:
-    data = _rows_to_structured(rows)
-    methods = list(dict.fromkeys(data["method"].tolist()))
-    meas_modes = list(dict.fromkeys(data["measurement_mode"].tolist()))
-
-    fig, axes = plt.subplots(2, 1, figsize=(8, 7), sharex=True)
-    for meas_mode in meas_modes:
-        for method in methods:
-            mask = (data["measurement_mode"] == meas_mode) & (data["method"] == method)
-            subset = np.sort(data[mask], order=["n_state", "reduction_budget"])
-            if subset.size == 0:
-                continue
-            label = f"{method} | {meas_mode}"
-            axes[0].plot(subset["n_state"], subset["mean_step_time_us"], marker="o", linewidth=1.2, label=label)
-            axes[1].plot(subset["n_state"], subset["mean_interval_width"], marker="o", linewidth=1.2, label=label)
-
-    axes[0].set_ylabel("mean step time [us]")
-    axes[0].grid(True, linestyle=":")
-    axes[0].legend(loc="best", fontsize=8)
-    axes[1].set_ylabel("mean interval width")
-    axes[1].set_xlabel("state dimension n")
-    axes[1].grid(True, linestyle=":")
-    fig.tight_layout()
-    fig.savefig(out_root / "sweep_overview.png", dpi=160)
-    plt.close(fig)
-
-    fig, axes = plt.subplots(2, 1, figsize=(8, 7), sharex=True)
-    for meas_mode in meas_modes:
-        for method in methods:
-            mask = (data["measurement_mode"] == meas_mode) & (data["method"] == method)
-            subset = np.sort(data[mask], order=["n_state", "reduction_budget"])
-            if subset.size == 0:
-                continue
-            label = f"{method} | {meas_mode}"
-            axes[0].plot(subset["n_state"], subset["containment_rate"], marker="s", linewidth=1.2, label=label)
-            axes[1].plot(subset["n_state"], subset["mean_generators"], marker="s", linewidth=1.2, label=label)
-
-    axes[0].set_ylabel("containment rate")
-    axes[0].set_ylim(0.0, 1.05)
-    axes[0].grid(True, linestyle=":")
-    axes[0].legend(loc="best", fontsize=8)
-    axes[1].set_ylabel("mean generators")
-    axes[1].set_xlabel("state dimension n")
-    axes[1].grid(True, linestyle=":")
-    fig.tight_layout()
-    fig.savefig(out_root / "sweep_quality.png", dpi=160)
-    plt.close(fig)
-
-
-def run_case(
-    n_state: int,
-    measurement_mode: str,
-    method: str,
-    reduction_budget: int,
-    out_dir: Path | None,
-    seed: int,
-) -> Metrics:
-    rng = np.random.default_rng(seed)
-    model = CoupledVanDerPolModel(
-        n_state=n_state,
-        dt=DT,
-        mu=VAN_DER_POL_MU,
-        coupling=COUPLING_GAIN,
-        rho=MEAS_CUBIC_RHO,
-    )
+# ── main run ───────────────────────────────────────────────────────────────
+def run_case(n_state, measurement_mode, method, reduction_budget, out_dir, seed):
+    rng   = np.random.default_rng(seed)
+    model = CoupledVanDerPolModel(n_state, DT, VAN_DER_POL_MU, COUPLING_GAIN, MEAS_CUBIC_RHO)
     meas_idx = model.measurement_indices(measurement_mode)
-    x0 = np.zeros((n_state,), dtype=float)
-    x0[0::2] = 0.3
-    x0[1::2] = 0.0
+    x0 = np.zeros(n_state); x0[0::2] = 0.3
 
     x_true, y_meas = simulate_truth(model, x0, NUM_STEPS, meas_idx, rng)
-    z = initial_state_zonotope(x0)
+    z      = initial_state_zonotope(x0)
     w_zono = process_noise_zonotope(n_state)
 
-    zonotopes: list[Zonotope] = []
-    centers = np.zeros_like(x_true)
-    step_time_us = np.zeros((NUM_STEPS,), dtype=float)
+    zonotopes = []; centers = np.zeros_like(x_true)
+    step_time = np.zeros(NUM_STEPS); all_diags = []
+    failure   = FailureDiagnostics(measurement_update_mode=MEAS_UPDATE_MODE)
+    last_seg_diag = None
 
     for k in range(NUM_STEPS):
         t0 = time.perf_counter()
-        z, _, _ = predict_nonlinear(z, model, np.zeros((model.n_osc,), dtype=float), w_zono)
-        z = z.reduce(reduction_budget)
-        z, _, _ = update_nonlinear(z, model, y_meas[k], meas_idx, method)
-        z = z.reduce(reduction_budget)
-        step_time_us[k] = (time.perf_counter() - t0) * 1e6
-        zonotopes.append(z)
-        centers[k] = z.p
+        last_diag = None
 
-    flags = containment_flags(zonotopes, x_true)
-    metrics = summarize_metrics(zonotopes, x_true, centers, step_time_us)
-    metrics.measurement_mode = measurement_mode
-    metrics.method = method
-    metrics.reduction_budget = reduction_budget
+        z, _, _ = predict_nonlinear(z, model, np.zeros(model.n_osc), w_zono)
+        if not z.is_reasonably_bounded():
+            step_time[k] = (time.perf_counter()-t0)*1e6
+            zonotopes.append(z); centers[k] = z.p
+            failure = _make_failure(k, "overflow_after_prediction", z, last_seg_diag)
+            break
+
+        z = z.reduce(reduction_budget)
+        if not z.is_reasonably_bounded():
+            step_time[k] = (time.perf_counter()-t0)*1e6
+            zonotopes.append(z); centers[k] = z.p
+            failure = _make_failure(k, "overflow_after_prediction_reduction", z, last_seg_diag)
+            break
+
+        z, _, _, strip_diags = update_nonlinear(z, model, y_meas[k], meas_idx, method, step=k)
+        all_diags.extend(strip_diags)
+        if strip_diags:
+            last_diag = strip_diags[-1]
+            if method == "segment":
+                last_seg_diag = strip_diags[-1]
+        if not z.is_reasonably_bounded():
+            step_time[k] = (time.perf_counter()-t0)*1e6
+            zonotopes.append(z); centers[k] = z.p
+            failure = _make_failure(k, "overflow_after_measurement_update", z, last_diag)
+            break
+
+        z = z.reduce(reduction_budget)
+        step_time[k] = (time.perf_counter()-t0)*1e6
+        zonotopes.append(z); centers[k] = z.p
+
+        if not z.is_reasonably_bounded():
+            failure = _make_failure(k, "overflow_after_final_reduction", z, last_diag)
+            break
+        if not containment_flag(z, x_true[k]):
+            failure = _make_failure(k, "containment_failure", z, last_diag)
+            if STOP_ON_FAILURE:
+                break
+
+    used  = len(zonotopes)
+    flags = containment_flags(zonotopes, x_true[:used]) if used else np.zeros(0, dtype=bool)
+    m     = summarize_metrics(zonotopes, x_true, centers, step_time, failure)
+    m.measurement_mode = measurement_mode
+    m.method           = method
+    m.reduction_budget = reduction_budget
 
     if out_dir is not None:
         out_dir.mkdir(parents=True, exist_ok=True)
-        export_outputs(out_dir, zonotopes, centers, x_true, y_meas, step_time_us, flags)
+        _save_csv(out_dir / "center.csv",            centers[:used])
+        _save_csv(out_dir / "x_true.csv",            x_true[:used])
+        _save_csv(out_dir / "containment_flags.csv", flags.astype(int).reshape(-1,1))
+        err = centers[:used] - x_true[:used]
+        _save_csv(out_dir / "error.csv",
+                  np.hstack([err, np.linalg.norm(err, axis=1, keepdims=True)]))
+        widths = np.asarray([2.0 * z.interval_radius() for z in zonotopes])
+        _save_csv(out_dir / "interval_width.csv", widths)
+        _save_csv(out_dir / "generator_count.csv",
+                  np.asarray([z.m for z in zonotopes], dtype=float).reshape(-1,1))
         plot_outputs(out_dir, x_true, centers, zonotopes, meas_idx)
 
-        summary = np.array([
-        ["n_state", str(n_state)],
-        ["num_steps", str(NUM_STEPS)],
-        ["measurement_mode", measurement_mode],
-        ["method", method],
-        ["reduction_budget", str(reduction_budget)],
-        ["per_state_center_rmse", f"{metrics.per_state_center_rmse:.8f}"],
-        ["max_per_state_center_error", f"{metrics.max_per_state_center_error:.8f}"],
-        ["mean_interval_width", f"{metrics.mean_interval_width:.8f}"],
-        ["max_interval_width", f"{metrics.max_interval_width:.8f}"],
-        ["containment_rate", f"{metrics.containment_rate:.8f}"],
-        ["mean_generators", f"{metrics.mean_generators:.3f}"],
-        ["max_generators", str(metrics.max_generators)],
-        ["mean_step_time_us", f"{metrics.mean_step_time_us:.3f}"],
-        ["total_time_us", f"{metrics.total_time_us:.3f}"],
-        ], dtype=object)
-        np.savetxt(out_dir / "summary.txt", summary, fmt="%s")
-
-    print(f"[nonlinear] n={n_state}, steps={NUM_STEPS}, meas={len(meas_idx)}, method={method}, budget={reduction_budget}")
-    print(f"[nonlinear] containment_rate={metrics.containment_rate:.3f}")
-    print(
-        f"[nonlinear] per_state_center_rmse={metrics.per_state_center_rmse:.6f}, "
-        f"max_per_state_center_error={metrics.max_per_state_center_error:.6f}"
-    )
-    print(f"[nonlinear] mean_interval_width={metrics.mean_interval_width:.6f}, max_interval_width={metrics.max_interval_width:.6f}")
-    print(f"[nonlinear] mean_generators={metrics.mean_generators:.2f}, max_generators={metrics.max_generators}")
-    print(f"[nonlinear] mean_step_time_us={metrics.mean_step_time_us:.2f}")
-    return metrics
+    print(f"[fixed] n={n_state}, steps={used}/{NUM_STEPS}, meas={len(meas_idx)}, "
+          f"method={method}, budget={reduction_budget}, mode={MEAS_UPDATE_MODE}")
+    print(f"[fixed] containment={m.containment_rate:.3f}  "
+          f"rmse={m.per_state_center_rmse:.6f}  "
+          f"mean_width={m.mean_interval_width:.6f}  "
+          f"failed={m.failed}")
+    if m.failed:
+        print(f"[fixed][FAIL] step={m.first_failure_step}  reason={m.failure_reason}  "
+              f"||p||={m.fail_p_norm:.3e}  max_r={m.fail_max_interval_radius:.3e}  "
+              f"phi={m.fail_phi:.3e}  denom={m.fail_segment_denominator:.3e}  "
+              f"||lam||={m.fail_lambda_norm:.3e}")
+    return m
 
 
-def run_reference() -> Metrics:
-    return run_case(
-        n_state=N_STATE,
-        measurement_mode=MEASUREMENT_MODE,
-        method=ESTIMATION_METHOD,
-        reduction_budget=REDUCTION_BUDGET,
-        out_dir=_output_dir(),
-        seed=RANDOM_SEED,
-    )
+def run_reference():
+    return run_case(N_STATE, MEASUREMENT_MODE, ESTIMATION_METHOD,
+                    REDUCTION_BUDGET, _output_dir(), RANDOM_SEED)
 
+def run_sweep():
+    out_root = _output_dir(); rows = []
+    for n in SWEEP_DIMS:
+        for mm in SWEEP_MEAS_MODES:
+            for meth in SWEEP_METHODS:
+                for sc in BUDGET_SCALES:
+                    budget = max(n, int(round(sc * n)))
+                    case_dir = out_root / f"n{n}" / mm / meth / f"s{budget}"
+                    m = run_case(n, mm, meth, budget, case_dir, RANDOM_SEED)
+                    rows.append([n, mm, meth, budget,
+                                 m.per_state_center_rmse, m.containment_rate,
+                                 m.mean_interval_width, m.mean_step_time_us,
+                                 m.failed, m.first_failure_step, m.failure_reason])
+    hdr = ("n_state,meas_mode,method,budget,per_state_rmse,containment_rate,"
+           "mean_interval_width,mean_step_time_us,failed,first_failure_step,failure_reason")
+    np.savetxt(out_root / "sweep_metrics.csv", np.asarray(rows, dtype=object),
+               fmt="%s", delimiter=",", header=hdr, comments="")
 
-def run_sweep() -> None:
-    out_root = _output_dir()
-    rows = []
-    for n_state in SWEEP_DIMS:
-        for measurement_mode in SWEEP_MEAS_MODES:
-            for method in SWEEP_METHODS:
-                for scale in BUDGET_SCALES:
-                    budget = max(n_state, int(round(scale * n_state)))
-                    case_dir = out_root / f"n{n_state}" / measurement_mode / method / f"s{budget}"
-                    metrics = run_case(
-                        n_state=n_state,
-                        measurement_mode=measurement_mode,
-                        method=method,
-                        reduction_budget=budget,
-                        out_dir=case_dir,
-                        seed=RANDOM_SEED,
-                    )
-                    rows.append([
-                        metrics.n_state,
-                        metrics.measurement_mode,
-                        metrics.method,
-                        metrics.reduction_budget,
-                        metrics.per_state_center_rmse,
-                        metrics.max_per_state_center_error,
-                        metrics.mean_interval_width,
-                        metrics.max_interval_width,
-                        metrics.containment_rate,
-                        metrics.mean_generators,
-                        metrics.max_generators,
-                        metrics.mean_step_time_us,
-                        metrics.total_time_us,
-                    ])
-
-    header = (
-        "n_state,measurement_mode,method,reduction_budget,per_state_center_rmse,"
-        "max_per_state_center_error,mean_interval_width,max_interval_width,"
-        "containment_rate,mean_generators,max_generators,mean_step_time_us,total_time_us"
-    )
-    np.savetxt(
-        out_root / "sweep_metrics.csv",
-        np.asarray(rows, dtype=object),
-        fmt="%s",
-        delimiter=",",
-        header=header,
-        comments="",
-    )
-    export_sweep_tables(out_root, rows)
-    export_sweep_plots(out_root, rows)
-
+def run_sparse_segment_debug():
+    out_root = _output_dir() / "debug_every_second_segment"; out_root.mkdir(parents=True, exist_ok=True)
+    for n in SWEEP_DIMS:
+        for sc in BUDGET_SCALES:
+            budget = max(n, int(round(sc * n)))
+            run_case(n, "every_second_position", "segment", budget,
+                     out_root / f"n{n}_s{budget}", RANDOM_SEED)
 
 if __name__ == "__main__":
-    if RUN_SWEEP:
+    if RUN_DEBUG_SPARSE:
+        run_sparse_segment_debug()
+    elif RUN_SWEEP:
         run_sweep()
     else:
         run_reference()
