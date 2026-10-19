@@ -77,6 +77,53 @@ regenerates the consistency table, so the committed numbers never go stale.
 
 ## Phase 1 software experiments
 
+### Three linear systems in Python
+
+Run `make python-linear-benchmarks` (or
+`python3 src/compare/compare_python_linear_systems.py --seeds 20 --steps 100`).
+This Python-only comparison retains the original 24-state independent-block
+oscillator and the adjacent-block-coupled oscillator, then adds a 12-state
+indoor-drone localization simulation. All three use the existing Python
+zonotope estimator and the same Fixed-gain, Segment and Volume methods. Each
+method receives the same simulated truth and measurements for a given seed.
+The two oscillator simulations retain their existing behavior.
+
+The indoor-drone model is defined in `src/python/indoor_drone_model.py`.
+Its state is `[position xyz (m), velocity xyz (m/s), roll/pitch/yaw (rad),
+roll/pitch/yaw rates (rad/s)]`. It is an exactly discretized (`dt=0.1 s`)
+small-angle model near **stabilized hover**: horizontal accelerations depend
+on pitch and roll, while velocity damping and attitude restoring terms
+represent a stabilizing inner loop. The known input commands vertical and
+angular accelerations. Six simulated measurements provide position xyz and
+roll/pitch/yaw, leaving velocities and angular rates unmeasured. Independent
+bounded process and measurement disturbances are sampled uniformly within
+the per-coordinate radii recorded in `results/python_linear_systems/indoor_drone_model.json`.
+The initial truth is the center of a bounded initial box. These dynamics,
+sensor channels and noise radii are **simulation assumptions**, not parameters
+identified from a real UAV or measured on the KR260. No avoidance controller
+or real flight is claimed. The example evaluates state estimation that could
+provide uncertainty bounds to a future avoidance system.
+
+Results are in `results/python_linear_systems/`:
+
+- `summary.csv`: mean and sample standard deviation across 20 seeds;
+- `per_seed.csv` and `per_step.csv`: audit-level values;
+- `python_linear_system_comparison.png`: within-system method comparisons;
+- `indoor_drone_model.json`: model state order, sensor channels and bounds;
+- `input_bundles/indoor_drone/seed_XXX.npz`: one saved truth, measurement,
+  control and matrix bundle per seed, replayed by all three Python methods.
+
+The drone adds position-center error (metres), mean position interval width
+(metres), and attitude-center error (radians). Its full-state `center_l2`,
+`width_mean` and log-volume proxy mix physical units, so compare those only
+within the same model and coordinate convention. `containment_rate` is strict
+full-state zonotope membership, solved by an LP for each tested state; 100%
+on these simulated trajectories is not a universal guarantee. Timings are
+Python host timings, not HLS or KR260 timings. The drone model has not been
+ported to C++ or HLS.
+
+### Existing Python and C++ sweep
+
 Run `make phase1` (NumPy, SciPy, Matplotlib and g++ required), or use
 `python3 src/compare/phase1_sweep.py --seeds 20 --steps 100 --output results/phase1`.
 The sweep runs Fixed-gain, Segment and Volume on the original block oscillator

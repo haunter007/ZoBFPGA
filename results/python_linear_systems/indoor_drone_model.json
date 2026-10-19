@@ -1,0 +1,124 @@
+{
+  "description": "Simulated stabilized-hover small-angle indoor drone localization",
+  "state_names": [
+    "px",
+    "py",
+    "pz",
+    "vx",
+    "vy",
+    "vz",
+    "roll",
+    "pitch",
+    "yaw",
+    "roll_rate",
+    "pitch_rate",
+    "yaw_rate"
+  ],
+  "measurement_names": [
+    "px",
+    "py",
+    "pz",
+    "roll",
+    "pitch",
+    "yaw"
+  ],
+  "input_names": [
+    "vertical_acceleration",
+    "roll_acceleration",
+    "pitch_acceleration",
+    "yaw_acceleration"
+  ],
+  "dt_s": 0.1,
+  "process_noise_radius": [
+    0.005,
+    0.005,
+    0.005,
+    0.02,
+    0.02,
+    0.02,
+    0.002,
+    0.002,
+    0.002,
+    0.01,
+    0.01,
+    0.01
+  ],
+  "measurement_noise_radius": [
+    0.1,
+    0.1,
+    0.1,
+    0.02,
+    0.02,
+    0.02
+  ],
+  "initial_state": [
+    1.0,
+    -0.5,
+    1.5,
+    0.15,
+    0.05,
+    0.0,
+    0.02,
+    -0.03,
+    0.01,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "initial_radius": [
+    0.25,
+    0.25,
+    0.25,
+    0.2,
+    0.2,
+    0.2,
+    0.05,
+    0.05,
+    0.05,
+    0.1,
+    0.1,
+    0.1
+  ],
+  "velocity_damping_per_s": [
+    0.3,
+    0.3,
+    0.4
+  ],
+  "attitude_stiffness_per_s2": [
+    3.0,
+    3.0,
+    2.0
+  ],
+  "rate_damping_per_s": [
+    1.8,
+    1.8,
+    1.5
+  ],
+  "observability_rank": 12,
+  "experiment_seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19
+  ],
+  "experiment_steps": 100,
+  "estimator_reduction_budget": 32,
+  "noise_sampling": "independent uniform samples within each coordinate's stated bound",
+  "note": "All parameters and sensors are simulation assumptions, not measured hardware values."
+}

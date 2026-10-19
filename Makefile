@@ -1,4 +1,4 @@
-.PHONY: python cpp-build cpp compare phase1 seeded-inputs hls-csim hls-csim-step hls-cosim hls-cosim-step \
+.PHONY: python cpp-build cpp compare phase1 python-linear-benchmarks seeded-inputs hls-csim hls-csim-step hls-cosim hls-cosim-step \
         crosscheck crosscheck-cpp-python crosscheck-full params
 
 # Single source of truth for N_STATE/N_MEAS/MAX_GEN/REDUCTION_BUDGET/... :
@@ -22,6 +22,9 @@ compare:
 
 phase1:
 	python3 src/compare/phase1_sweep.py --seeds 20 --steps 100
+
+python-linear-benchmarks:
+	python3 src/compare/compare_python_linear_systems.py --seeds 20 --steps 100
 
 seeded-inputs:
 	python3 tools/generate_seeded_replay_bundles.py --n-seeds 20 --n-steps 100
