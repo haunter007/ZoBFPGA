@@ -1246,8 +1246,10 @@ static int run_batch_compare_debug() {
     for (int block = 0; block < N_STATE / 4; ++block) {
         const int meas_base = block * 2;
         const int state_base = block * 4;
-        C[meas_base + 0][state_base + 0] = 1.0f;
-        C[meas_base + 1][state_base + 1] = 1.0f;
+        if (meas_base + 1 < N_MEAS) {
+            C[meas_base + 0][state_base + 0] = 1.0f;
+            C[meas_base + 1][state_base + 1] = 1.0f;
+        }
     }
 
     g_seed = RANDOM_SEED;

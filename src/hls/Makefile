@@ -25,7 +25,7 @@ TB_SRC     = testbench.cpp
 INC       = -I../../include
 HLS_CFLAGS ?=
 # SIZE_CFLAGS lets a parameter sweep override the single-source config, e.g.
-#   make csim-segment SIZE_CFLAGS="-DN_STATE=48 -DN_MEAS=24 -DREDUCTION_BUDGET=64 -DMAX_GEN=136"
+#   make csim-segment SIZE_CFLAGS="-DN_STATE=16 -DN_MEAS=8 -DREDUCTION_BUDGET=24 -DMAX_GEN=40"
 SIZE_CFLAGS ?=
 METHOD ?= segment
 METHOD_ID_segment = 1

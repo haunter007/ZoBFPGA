@@ -1,0 +1,4 @@
+Method,Input Bundle Consistent,Max Python-C++ Centre Difference,Max Python-HLS Centre Difference,Max C++-HLS Centre Difference,Max Python-C++ Radius Difference,Max Python-HLS Radius Difference,Max C++-HLS Radius Difference,Max Python-C++ Radius Relative Difference,Max Python-HLS Radius Relative Difference,Max C++-HLS Radius Relative Difference,Generator Count Consistent
+Fixed-gain,Yes,1.674489201e-06,1.674489201e-06,0,0.006158632307,0.007122230798,0.005096435547,1.25222345e-06,1.267933999e-06,1.260266048e-06,Yes
+Segment,Yes,2.123686863e-06,2.304867085e-06,1.792108581e-06,5.39093822e-07,6.091108204e-07,7.189810276e-07,2.940560088e-07,4.121585159e-07,4.686284861e-07,Yes
+Volume,Yes,1.011001676e-06,9.274053753e-07,3.371747881e-07,0.00396261977,0.004010728515,0.002532958984,0.000365869552,0.000365869552,6.407252805e-07,Yes

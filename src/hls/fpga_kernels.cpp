@@ -11,6 +11,12 @@ static constexpr int OSC_BLOCK_SIZE = 4;
 static constexpr int OSC_BLOCKS = N_STATE / OSC_BLOCK_SIZE;
 static constexpr int SELECTED_LAMBDA_METHOD = HLS_LAMBDA_METHOD_ID;
 
+// The accelerated correction below supports the first two observed states
+// of each 4-state oscillator block, up to the six blocks implemented here.
+#if N_STATE % 4 != 0 || N_STATE > 24 || N_MEAS % 2 != 0 || N_MEAS < 2 || N_MEAS > N_STATE / 2
+#error "HLS oscillator kernel requires N_STATE=4..24 in blocks of 4 and even N_MEAS <= N_STATE/2"
+#endif
+
 static inline int meas_state_index(int meas) {
 #pragma HLS INLINE
     return (meas / 2) * OSC_BLOCK_SIZE + (meas % 2);
@@ -160,16 +166,26 @@ static inline void NAME( \
 
 DEFINE_MEAS_UPDATE_FUNC(apply_meas_b0_s0, 0, 0)
 DEFINE_MEAS_UPDATE_FUNC(apply_meas_b0_s1, 0, 1)
+#if N_STATE >= 8 && N_MEAS >= 4
 DEFINE_MEAS_UPDATE_FUNC(apply_meas_b4_s4, 4, 4)
 DEFINE_MEAS_UPDATE_FUNC(apply_meas_b4_s5, 4, 5)
+#endif
+#if N_STATE >= 12 && N_MEAS >= 6
 DEFINE_MEAS_UPDATE_FUNC(apply_meas_b8_s8, 8, 8)
 DEFINE_MEAS_UPDATE_FUNC(apply_meas_b8_s9, 8, 9)
+#endif
+#if N_STATE >= 16 && N_MEAS >= 8
 DEFINE_MEAS_UPDATE_FUNC(apply_meas_b12_s12, 12, 12)
 DEFINE_MEAS_UPDATE_FUNC(apply_meas_b12_s13, 12, 13)
+#endif
+#if N_STATE >= 20 && N_MEAS >= 10
 DEFINE_MEAS_UPDATE_FUNC(apply_meas_b16_s16, 16, 16)
 DEFINE_MEAS_UPDATE_FUNC(apply_meas_b16_s17, 16, 17)
+#endif
+#if N_STATE >= 24 && N_MEAS >= 12
 DEFINE_MEAS_UPDATE_FUNC(apply_meas_b20_s20, 20, 20)
 DEFINE_MEAS_UPDATE_FUNC(apply_meas_b20_s21, 20, 21)
+#endif
 
 void predict_kernel(
     const data_t p_x[N_STATE],
@@ -463,16 +479,26 @@ void zonotope_step_kernel(
     // two observed states per independent 4-state oscillator block.
     apply_meas_b0_s0(p_inout, H_inout, &m, y[0], phi[0]);
     apply_meas_b0_s1(p_inout, H_inout, &m, y[1], phi[1]);
+#if N_STATE >= 8 && N_MEAS >= 4
     apply_meas_b4_s4(p_inout, H_inout, &m, y[2], phi[2]);
     apply_meas_b4_s5(p_inout, H_inout, &m, y[3], phi[3]);
+#endif
+#if N_STATE >= 12 && N_MEAS >= 6
     apply_meas_b8_s8(p_inout, H_inout, &m, y[4], phi[4]);
     apply_meas_b8_s9(p_inout, H_inout, &m, y[5], phi[5]);
+#endif
+#if N_STATE >= 16 && N_MEAS >= 8
     apply_meas_b12_s12(p_inout, H_inout, &m, y[6], phi[6]);
     apply_meas_b12_s13(p_inout, H_inout, &m, y[7], phi[7]);
+#endif
+#if N_STATE >= 20 && N_MEAS >= 10
     apply_meas_b16_s16(p_inout, H_inout, &m, y[8], phi[8]);
     apply_meas_b16_s17(p_inout, H_inout, &m, y[9], phi[9]);
+#endif
+#if N_STATE >= 24 && N_MEAS >= 12
     apply_meas_b20_s20(p_inout, H_inout, &m, y[10], phi[10]);
     apply_meas_b20_s21(p_inout, H_inout, &m, y[11], phi[11]);
+#endif
 
     // 4. Final reduce
     assert(m <= STEP_MEAS_MAX_GEN);
