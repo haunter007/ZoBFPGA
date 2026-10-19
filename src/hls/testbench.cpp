@@ -144,21 +144,51 @@ static bool load_csv_values(const std::string& path, std::vector<data_t>* out) {
     return true;
 }
 
-static int run_file_input_debug(const char* input_dir) {
+static int infer_flat_generator_count(const std::vector<data_t>& H_flat) {
+    int count = 0;
+    for (int c = 0; c < MAX_GEN; ++c) {
+        bool nonzero = false;
+        for (int r = 0; r < N_STATE; ++r) {
+            const data_t v = H_flat[r * MAX_GEN + c];
+            if (std::fabs((double)v) > 1e-12) {
+                nonzero = true;
+                break;
+            }
+        }
+        if (nonzero) count++;
+    }
+    return count;
+}
+
+static void remove_zonotope_files(const std::string& out_dir) {
+    DIR* d = opendir(out_dir.c_str());
+    if (!d) return;
+    struct dirent* entry;
+    while ((entry = readdir(d)) != nullptr) {
+        const char* name = entry->d_name;
+        if (std::strncmp(name, "zonotope_", 9) == 0) {
+            std::remove((out_dir + "/" + name).c_str());
+        }
+    }
+    closedir(d);
+}
+
+static int run_file_input_debug(const char* input_dir, const std::string& out_base_dir) {
     const std::string base = input_dir ? input_dir : "";
     if (base.empty()) {
         std::fprintf(stderr, "[filedbg] missing input dir\n");
         return 70;
     }
 
-    std::vector<data_t> A_flat, y_flat, phi_flat, p_input_flat, H_input_flat, p_w_flat, H_w_flat;
+    std::vector<data_t> A_flat, y_flat, phi_flat, p_input_flat, H_input_flat, p_w_flat, H_w_flat, x_true_flat;
     if (!load_csv_values(base + "/A.csv", &A_flat) ||
         !load_csv_values(base + "/y_all.csv", &y_flat) ||
         !load_csv_values(base + "/phi_all.csv", &phi_flat) ||
         !load_csv_values(base + "/p_input.csv", &p_input_flat) ||
         !load_csv_values(base + "/H_input.csv", &H_input_flat) ||
         !load_csv_values(base + "/p_w.csv", &p_w_flat) ||
-        !load_csv_values(base + "/H_w.csv", &H_w_flat)) {
+        !load_csv_values(base + "/H_w.csv", &H_w_flat) ||
+        !load_csv_values(base + "/x_true.csv", &x_true_flat)) {
         std::fprintf(stderr, "[filedbg] failed to load CSV bundle from %s\n", base.c_str());
         return 71;
     }
@@ -168,10 +198,25 @@ static int run_file_input_debug(const char* input_dir) {
         (int)H_input_flat.size() != N_STATE * MAX_GEN ||
         (int)p_w_flat.size() != N_STATE ||
         (int)H_w_flat.size() != N_STATE * MAX_GEN ||
+        (x_true_flat.size() % N_STATE) != 0 ||
         y_flat.size() != phi_flat.size() ||
         (y_flat.size() % N_MEAS) != 0) {
         std::fprintf(stderr, "[filedbg] CSV size mismatch\n");
         return 72;
+    }
+
+    // The accelerated step kernel multiplies only the diagonal 4x4 blocks.
+    // Reject coupled inputs here instead of silently reporting invalid replay.
+    for (int i = 0; i < N_STATE; ++i) {
+        for (int j = 0; j < N_STATE; ++j) {
+            if (i / 4 != j / 4 && A_flat[i * N_STATE + j] != 0.0f) {
+                std::fprintf(stderr,
+                             "[filedbg] unsupported off-block A[%d,%d]=%g; "
+                             "this HLS kernel requires a block-diagonal transition matrix\n",
+                             i, j, (double)A_flat[i * N_STATE + j]);
+                return 73;
+            }
+        }
     }
 
     int compare_steps = (int)(y_flat.size() / N_MEAS);
@@ -187,8 +232,8 @@ static int run_file_input_debug(const char* input_dir) {
     data_t H_batch[N_STATE][MAX_GEN] = {};
     data_t p_w[N_STATE] = {};
     data_t H_w[N_STATE][MAX_GEN] = {};
-    int m_seq = N_STATE;
-    int m_batch = N_STATE;
+    int m_seq = infer_flat_generator_count(H_input_flat);
+    int m_batch = m_seq;
 
     for (int r = 0; r < N_STATE; ++r) {
         p_seq[r] = p_input_flat[r];
@@ -202,7 +247,49 @@ static int run_file_input_debug(const char* input_dir) {
         }
     }
 
+    const int x_rows = (int)(x_true_flat.size() / N_STATE);
+    const bool x_has_step0 = (x_rows == compare_steps + 1);
+    const std::string out_dir = out_base_dir + "/" + HLS_LAMBDA_METHOD_NAME;
+    mkdir_p(out_dir);
+    const std::string center_csv = out_dir + "/center.csv";
+    const std::string x_true_csv = out_dir + "/x_true.csv";
+    const std::string meas_csv = out_dir + "/meas.csv";
+    const std::string error_csv = out_dir + "/error.csv";
+    const std::string ktime_step_csv = out_dir + "/kernel_time_step_us.csv";
+    const std::string ktime_sum_csv = out_dir + "/kernel_time_summary_us.csv";
+    csv_reset(center_csv);
+    csv_reset(x_true_csv);
+    csv_reset(meas_csv);
+    csv_reset(error_csv);
+    csv_reset(ktime_step_csv);
+    csv_reset(ktime_sum_csv);
+    remove_zonotope_files(out_dir);
+
+    Zonotope Z0;
+    Z0.n = N_STATE;
+    Z0.m = m_seq;
+    for (int i = 0; i < N_STATE; ++i) {
+        Z0.p[i] = p_seq[i];
+        for (int j = 0; j < MAX_GEN; ++j) Z0.H[i][j] = H_seq[i][j];
+    }
+    dump_center_append(center_csv.c_str(), p_seq);
+    dump_true_append(x_true_csv.c_str(), x_has_step0 ? &x_true_flat[0] : p_input_flat.data());
+    dump_zonotope_csv(Z0, 0, out_dir.c_str());
+    {
+        data_t err_row[N_STATE + 1] = {0};
+        data_t l2 = 0.0;
+        const data_t* x0 = x_has_step0 ? &x_true_flat[0] : p_input_flat.data();
+        for (int i = 0; i < N_STATE; ++i) {
+            const data_t e = p_seq[i] - x0[i];
+            err_row[i] = e;
+            l2 += e * e;
+        }
+        err_row[N_STATE] = std::sqrt(l2);
+        csv_append_row(error_csv, err_row, N_STATE + 1);
+    }
+
     std::printf("[filedbg] sequential trace from %s\n", base.c_str());
+    const auto t0 = std::chrono::high_resolution_clock::now();
     for (int k = 0; k < compare_steps; ++k) {
         data_t y_step[N_MEAS];
         data_t phi_step[N_MEAS];
@@ -210,13 +297,45 @@ static int run_file_input_debug(const char* input_dir) {
             y_step[j] = y_flat[k * N_MEAS + j];
             phi_step[j] = phi_flat[k * N_MEAS + j];
         }
+        csv_append_row(meas_csv, y_step, N_MEAS);
         zonotope_step_kernel(p_seq, H_seq, &m_seq, A, p_w, H_w, N_STATE, y_step, phi_step, REDUCTION_BUDGET);
         const bool p_ok = all_finite_vec(p_seq, N_STATE, nullptr);
         const bool H_ok = all_finite_mat(H_seq, N_STATE, MAX_GEN, nullptr, nullptr);
         std::printf("[filedbg] seq step=%d p=%s H=%s m=%d\n", k + 1, p_ok ? "finite" : "NONFINITE",
                     H_ok ? "finite" : "NONFINITE", m_seq);
         if (!p_ok || !H_ok) return 80 + k;
+        const int x_row = x_has_step0 ? k + 1 : k;
+        dump_true_append(x_true_csv.c_str(), &x_true_flat[x_row * N_STATE]);
+        dump_center_append(center_csv.c_str(), p_seq);
+        Zonotope Zstep;
+        Zstep.n = N_STATE;
+        Zstep.m = m_seq;
+        for (int i = 0; i < N_STATE; ++i) {
+            Zstep.p[i] = p_seq[i];
+            for (int j = 0; j < MAX_GEN; ++j) Zstep.H[i][j] = H_seq[i][j];
+        }
+        dump_zonotope_csv(Zstep, k + 1, out_dir.c_str());
+        data_t err_row[N_STATE + 1] = {0};
+        data_t l2 = 0.0;
+        const data_t* x_ref = &x_true_flat[x_row * N_STATE];
+        for (int i = 0; i < N_STATE; ++i) {
+            const data_t e = p_seq[i] - x_ref[i];
+            err_row[i] = e;
+            l2 += e * e;
+        }
+        err_row[N_STATE] = std::sqrt(l2);
+        csv_append_row(error_csv, err_row, N_STATE + 1);
     }
+    const auto t1 = std::chrono::high_resolution_clock::now();
+    const data_t total_us = (data_t)std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                t1 - t0).count() / 1000.0;
+    const data_t avg_us = compare_steps > 0 ? total_us / (data_t)compare_steps : 0.0;
+    const data_t ktime_row[3] = {avg_us, 0.0, 0.0};
+    const data_t summary_row[9] = {total_us, 0.0, 0.0,
+                                    (data_t)compare_steps, 0.0, 0.0,
+                                    avg_us, 0.0, 0.0};
+    csv_append_row(ktime_step_csv, ktime_row, 3);
+    csv_append_row(ktime_sum_csv, summary_row, 9);
 
     std::printf("[filedbg] batch trace from %s\n", base.c_str());
     zonotope_batch_kernel_axi(p_batch, &H_batch[0][0], &m_batch, &A[0][0], p_w, &H_w[0][0], N_STATE,
@@ -225,6 +344,7 @@ static int run_file_input_debug(const char* input_dir) {
     if (!all_finite_vec(p_batch, N_STATE, nullptr) || !all_finite_mat(H_batch, N_STATE, MAX_GEN, nullptr, nullptr)) {
         return 180;
     }
+    std::printf("[filedbg] replay outputs under: %s\n", out_dir.c_str());
     return 0;
 }
 
@@ -680,7 +800,7 @@ struct MethodItem {
 };
 
 static const MethodItem kMethods[] = {
-    {LAMBDA_SEGMENT, "LAMBDA_SEGMENT"},
+    {(LambdaMethod)HLS_LAMBDA_METHOD_ID, HLS_LAMBDA_METHOD_NAME},
 };
 
 static void run_one_method(LambdaMethod method, const char* method_name, const std::string& out_base_dir) {
@@ -1326,6 +1446,7 @@ int main() {
     const char* debug_first_step = std::getenv("HLS_DEBUG_FIRST_STEP");
     const char* debug_batch_compare = std::getenv("HLS_DEBUG_BATCH_COMPARE");
     const char* debug_file_input_dir = std::getenv("HLS_DEBUG_FILE_INPUT_DIR");
+    const char* replay_input_dir = std::getenv("HLS_REPLAY_INPUT_DIR");
 
     std::printf("FPGA TB repo_root=%s\n", repo_root.c_str());
     std::printf("FPGA TB out_base=%s\n", out_base_dir.c_str());
@@ -1337,8 +1458,11 @@ int main() {
     if (debug_batch_compare && debug_batch_compare[0] != '\0') {
         return run_batch_compare_debug();
     }
+    if (replay_input_dir && replay_input_dir[0] != '\0') {
+        return run_file_input_debug(replay_input_dir, out_base_dir);
+    }
     if (debug_file_input_dir && debug_file_input_dir[0] != '\0') {
-        return run_file_input_debug(debug_file_input_dir);
+        return run_file_input_debug(debug_file_input_dir, out_base_dir);
     }
 
     bool ran_any = false;
@@ -1353,7 +1477,7 @@ int main() {
 
     if (!ran_any) {
         std::printf("No method matched HLS_LAMBDA_METHOD=%s\n", (only_method && only_method[0]) ? only_method : "(unset)");
-        std::printf("Valid: LAMBDA_SEGMENT\n");
+        std::printf("Valid: %s\n", HLS_LAMBDA_METHOD_NAME);
         return 2;
     }
 

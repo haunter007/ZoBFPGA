@@ -1,0 +1,22 @@
+{
+  "seed": 10,
+  "benchmark": "dense",
+  "cross_gain": 0.05,
+  "dt": 0.1,
+  "omega": 0.5,
+  "zeta": 0.05,
+  "eps": 0.1,
+  "noise_generator": "LCG 1664525*x + 1013904223 (uint32)",
+  "n_state": 24,
+  "n_meas": 12,
+  "n_steps": 100,
+  "max_gens": 64,
+  "reduction_budget": 32,
+  "h_init_cols": 24,
+  "m_w": 24,
+  "init_radius": 0.2,
+  "proc_noise_radius": 0.05,
+  "meas_noise_radius": 0.1,
+  "x_true_includes_step0": true,
+  "measurement_row_k_uses_x_true_row": "k+1"
+}

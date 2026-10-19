@@ -1,0 +1,17 @@
+seed=15
+n_state=24
+n_meas=12
+n_steps=100
+max_gens=64
+reduction_budget=32
+h_init_cols=24
+m_w=24
+A_shape=(24, 24)
+C_shape=(12, 24)
+x_true_shape=(101, 24)
+y_all_shape=(100, 12)
+phi_all_shape=(100, 12)
+p_input_shape=(24,)
+H_input_shape=(24, 64)
+p_w_shape=(24,)
+H_w_shape=(24, 64)

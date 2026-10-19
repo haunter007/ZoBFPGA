@@ -97,7 +97,9 @@ void zonotope_reduce(Zonotope* Z, int max_gens) {
     }
 
     std::sort(idx.begin(), idx.end(), [&](int a, int b) {
-        return norms[a] > norms[b];
+        if (norms[a] > norms[b]) return true;
+        if (norms[a] < norms[b]) return false;
+        return a < b;
     });
 
     int keep = max_gens - n;

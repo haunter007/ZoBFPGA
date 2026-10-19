@@ -14,6 +14,10 @@
 #include "zonotope.hpp"
 
 static unsigned int g_seed = RANDOM_SEED;
+static unsigned int run_seed() {
+    const char* value = std::getenv("ZONO_RANDOM_SEED");
+    return value ? static_cast<unsigned int>(std::strtoul(value, nullptr, 10)) : RANDOM_SEED;
+}
 static inline double rand01() {
     g_seed = 1664525u * g_seed + 1013904223u;
     return (double)((g_seed >> 8) & 0x00FFFFFFu) / 16777216.0;
@@ -37,6 +41,20 @@ static void csv_append_row(const std::string& path, const data_t* x, int n) {
     if (!f) return;
     for (int i = 0; i < n; ++i) {
         std::fprintf(f, "%.17g%c", (double)x[i], (i == n - 1) ? '\n' : ',');
+    }
+    std::fclose(f);
+}
+
+static void save_zonotope(const std::string& path, const Zonotope& z) {
+    FILE* f = std::fopen(path.c_str(), "w");
+    if (!f) { std::perror(path.c_str()); std::exit(1); }
+    std::fprintf(f, "p");
+    for (int i = 0; i < z.n; ++i) std::fprintf(f, ",%.17g", (double)z.p[i]);
+    std::fprintf(f, "\n");
+    for (int j = 0; j < z.m; ++j) {
+        std::fprintf(f, "H");
+        for (int i = 0; i < z.n; ++i) std::fprintf(f, ",%.17g", (double)z.H[i][j]);
+        std::fprintf(f, "\n");
     }
     std::fclose(f);
 }
@@ -78,7 +96,7 @@ static void prepare_synthetic_batch_inputs(
 }
 
 static void run_one_method(LambdaMethod method, const char* method_name, const std::string& out_base) {
-    g_seed = RANDOM_SEED;
+    g_seed = run_seed();
     const std::string out_dir = out_base + "/" + method_name;
     mkdir_p(out_dir);
 
@@ -102,6 +120,17 @@ static void run_one_method(LambdaMethod method, const char* method_name, const s
         for (int i = 0; i < 4; ++i)
             for (int j = 0; j < 4; ++j)
                 g_A[b*4+i][b*4+j] = A_block[i][j];
+    const char* benchmark = std::getenv("ZONO_BENCHMARK");
+    if (benchmark && std::strcmp(benchmark, "dense") == 0) {
+        for (int b = 0; b + 1 < N_STATE/4; ++b)
+            for (int i = 0; i < 2; ++i) {
+                g_A[b*4+i][(b+1)*4+i] += 0.05f;
+                g_A[(b+1)*4+i][b*4+i] += 0.05f;
+            }
+    } else if (benchmark && std::strcmp(benchmark, "oscillator") != 0) {
+        std::fprintf(stderr, "Unknown ZONO_BENCHMARK: %s\n", benchmark);
+        std::exit(2);
+    }
 
     std::memset(g_C, 0, sizeof(g_C));
     for (int block = 0; block < N_STATE / 4; ++block) {
@@ -128,6 +157,8 @@ static void run_one_method(LambdaMethod method, const char* method_name, const s
     for (int i = 0; i < N_STATE; ++i) {
         g_X.H[i][i] = INIT_RADIUS;
     }
+    const bool export_zonotopes = std::getenv("ZONO_EXPORT_ZONOTOPES") != nullptr;
+    if (export_zonotopes) save_zonotope(out_dir + "/zonotope_000.csv", g_X);
 
     std::memset(g_H_w, 0, sizeof(g_H_w));
     for (int i = 0; i < N_STATE; ++i) g_H_w[i][i] = PROC_NOISE_RADIUS;
@@ -138,22 +169,32 @@ static void run_one_method(LambdaMethod method, const char* method_name, const s
     std::vector<data_t> p_next2(N_STATE, 0.0f);
     std::vector<data_t> err(N_STATE + 1, 0.0f);
     data_t total_us = 0.0f;
+    double estimator_us = 0.0;
     auto t0 = std::chrono::high_resolution_clock::now();
     for (int k = 0; k < NUM_STEPS; ++k) {
         const std::vector<data_t>& x_true = x_true_seq[k];
         const std::vector<data_t>& y_k = y_seq[k];
         csv_append_row(meas_csv, y_k.data(), N_MEAS);
 
+        auto estimator_start = std::chrono::high_resolution_clock::now();
         int m_pred = 0;
         predict_kernel(g_X.p, g_X.H, g_X.m, g_A, p_w.data(), g_H_w, N_STATE, p_pred.data(), g_H_tmp1, &m_pred);
 
-        std::memcpy(p_upd.data(), p_pred.data(), sizeof(data_t) * N_STATE);
-        int m_upd = m_pred;
-        std::memcpy(g_H_tmp2, g_H_tmp1, sizeof(g_H_tmp2));
+        // Reserve room for all sequential measurement generators. Without
+        // this reduction, 32 + 24 + 12 exceeds MAX_GEN=64 after step one.
+        Zonotope predicted;
+        predicted.n = N_STATE; predicted.m = m_pred;
+        std::memcpy(predicted.p, p_pred.data(), sizeof(data_t) * N_STATE);
+        std::memcpy(predicted.H, g_H_tmp1, sizeof(predicted.H));
+        zonotope_reduce(&predicted, REDUCTION_BUDGET);
+
+        std::memcpy(p_upd.data(), predicted.p, sizeof(data_t) * N_STATE);
+        int m_upd = predicted.m;
+        std::memcpy(g_H_tmp2, predicted.H, sizeof(g_H_tmp2));
 
         for (int meas = 0; meas < N_MEAS; ++meas) {
             data_t lambda[N_STATE];
-            if (method == LAMBDA_NONE) { for (int j=0; j<N_STATE; ++j) lambda[j] = g_C[meas][j]; }
+            if (method == LAMBDA_FIXED_GAIN) { for (int j=0; j<N_STATE; ++j) lambda[j] = g_C[meas][j]; }
             else if (method == LAMBDA_SEGMENT) compute_lambda_segment(lambda, g_H_tmp2, m_upd, g_C[meas], MEAS_NOISE_RADIUS);
             else if (method == LAMBDA_VOLUME) compute_lambda_volume(lambda, g_H_tmp2, m_upd, g_C[meas], MEAS_NOISE_RADIUS);
             else compute_lambda_p_radius(lambda, g_H_tmp2, m_upd, g_C[meas], MEAS_NOISE_RADIUS);
@@ -168,6 +209,13 @@ static void run_one_method(LambdaMethod method, const char* method_name, const s
         g_X.m = m_upd; for (int i = 0; i < N_STATE; ++i) g_X.p[i] = p_upd[i];
         std::memcpy(g_X.H, g_H_tmp2, sizeof(g_X.H));
         zonotope_reduce(&g_X, REDUCTION_BUDGET);
+        estimator_us += std::chrono::duration<double, std::micro>(
+            std::chrono::high_resolution_clock::now() - estimator_start).count();
+        if (export_zonotopes) {
+            char name[64];
+            std::snprintf(name, sizeof(name), "/zonotope_%03d.csv", k + 1);
+            save_zonotope(out_dir + name, g_X);
+        }
 
         dump_true_append(x_true_csv.c_str(), x_true.data());
         dump_center_append(center_csv.c_str(), g_X.p);
@@ -179,16 +227,20 @@ static void run_one_method(LambdaMethod method, const char* method_name, const s
     }
     auto t1 = std::chrono::high_resolution_clock::now();
     total_us = (data_t)std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count() / 1000.0f;
-    data_t summary[3] = {total_us, total_us / NUM_STEPS, (data_t)NUM_STEPS};
-    data_t timing_row[3] = {total_us / NUM_STEPS, 0.0f, 0.0f};
+    data_t summary[3] = {(data_t)estimator_us, (data_t)(estimator_us / NUM_STEPS), (data_t)NUM_STEPS};
+    data_t timing_row[3] = {(data_t)(estimator_us / NUM_STEPS), 0.0f, 0.0f};
     csv_append_row(ktime_csv, timing_row, 3);
     csv_append_row(ksum_csv, summary, 3);
-    std::printf("[%s] total=%.2fus (%d steps), avg=%.2fus/step\n",
-                method_name, (double)total_us, NUM_STEPS, (double)(total_us / NUM_STEPS));
+    std::printf("[%s] wall=%.2fus, estimator=%.2fus (%d steps), avg=%.2fus/step\n",
+                method_name, (double)total_us, estimator_us, NUM_STEPS, estimator_us / NUM_STEPS);
 }
 
 int main() {
-    mkdir_p("data/output/cpp");
-    run_one_method(LAMBDA_SEGMENT, "LAMBDA_SEGMENT", "data/output/cpp");
+    const char* env_out = std::getenv("ZONO_OUTPUT_BASE");
+    const std::string out_base = env_out ? env_out : "data/output/cpp";
+    mkdir_p(out_base);
+    run_one_method(LAMBDA_FIXED_GAIN, "Fixed-gain", out_base);
+    run_one_method(LAMBDA_SEGMENT, "LAMBDA_SEGMENT", out_base);
+    run_one_method(LAMBDA_VOLUME, "LAMBDA_VOLUME", out_base);
     return 0;
 }

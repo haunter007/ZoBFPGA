@@ -5,15 +5,171 @@
 
 extern "C" {
 
-static constexpr int STATE_PAR = 8;
+static constexpr int STATE_PAR = N_STATE;
 static constexpr int STATE_BLOCKS = N_STATE / STATE_PAR;
 static constexpr int OSC_BLOCK_SIZE = 4;
 static constexpr int OSC_BLOCKS = N_STATE / OSC_BLOCK_SIZE;
+static constexpr int SELECTED_LAMBDA_METHOD = HLS_LAMBDA_METHOD_ID;
 
 static inline int meas_state_index(int meas) {
 #pragma HLS INLINE
     return (meas / 2) * OSC_BLOCK_SIZE + (meas % 2);
 }
+
+#if HLS_LAMBDA_METHOD_ID == HLS_LAMBDA_METHOD_SEGMENT
+#define DEFINE_MEAS_UPDATE_FUNC(NAME, BASE, CIDX) \
+static inline void NAME( \
+    data_t p_inout[N_STATE], \
+    data_t H_inout[N_STATE][MAX_GEN], \
+    int* m_inout, \
+    data_t y_val, \
+    data_t phi_meas \
+) { \
+    _Pragma("HLS INLINE") \
+    _Pragma("HLS ARRAY_PARTITION variable=p_inout complete dim=1") \
+    _Pragma("HLS ARRAY_PARTITION variable=H_inout complete dim=1") \
+    const int m = *m_inout; \
+    assert(m <= STEP_MEAS_MAX_GEN); \
+    const data_t residual = p_inout[CIDX]; \
+    const data_t r = y_val - residual; \
+    const int ACCUM_LANES = 4; \
+    data_t acc[ACCUM_LANES][OSC_BLOCK_SIZE]; \
+    _Pragma("HLS ARRAY_PARTITION variable=acc complete dim=1") \
+    _Pragma("HLS ARRAY_PARTITION variable=acc complete dim=2") \
+    for (int l = 0; l < ACCUM_LANES; ++l) { \
+        _Pragma("HLS UNROLL") \
+        for (int i = 0; i < OSC_BLOCK_SIZE; ++i) { \
+            _Pragma("HLS UNROLL") \
+            acc[l][i] = 0.0f; \
+        } \
+    } \
+    for (int j = 0; j < m; ++j) { \
+        _Pragma("HLS PIPELINE II=1") \
+        _Pragma("HLS LOOP_TRIPCOUNT min=0 max=STEP_MEAS_MAX_GEN") \
+        const int lane = j & (ACCUM_LANES - 1); \
+        const data_t h_dot_c = H_inout[CIDX][j]; \
+        acc[lane][0] += H_inout[(BASE) + 0][j] * h_dot_c; \
+        acc[lane][1] += H_inout[(BASE) + 1][j] * h_dot_c; \
+        acc[lane][2] += H_inout[(BASE) + 2][j] * h_dot_c; \
+        acc[lane][3] += H_inout[(BASE) + 3][j] * h_dot_c; \
+    } \
+    data_t hht0 = 0.0f; \
+    data_t hht1 = 0.0f; \
+    data_t hht2 = 0.0f; \
+    data_t hht3 = 0.0f; \
+    for (int l = 0; l < ACCUM_LANES; ++l) { \
+        _Pragma("HLS UNROLL") \
+        hht0 += acc[l][0]; \
+        hht1 += acc[l][1]; \
+        hht2 += acc[l][2]; \
+        hht3 += acc[l][3]; \
+    } \
+    data_t denom_hht = hht0; \
+    if ((CIDX) == (BASE) + 1) denom_hht = hht1; \
+    else if ((CIDX) == (BASE) + 2) denom_hht = hht2; \
+    else if ((CIDX) == (BASE) + 3) denom_hht = hht3; \
+    const data_t denom = phi_meas * phi_meas + denom_hht; \
+    data_t lambda0 = 0.0f; \
+    data_t lambda1 = 0.0f; \
+    data_t lambda2 = 0.0f; \
+    data_t lambda3 = 0.0f; \
+    if (std::fabs(denom) >= 1e-12f) { \
+        const data_t inv_denom = 1.0f / denom; \
+        lambda0 = hht0 * inv_denom; \
+        lambda1 = hht1 * inv_denom; \
+        lambda2 = hht2 * inv_denom; \
+        lambda3 = hht3 * inv_denom; \
+    } \
+    for (int j = 0; j < m; ++j) { \
+        _Pragma("HLS LOOP_TRIPCOUNT min=0 max=STEP_MEAS_MAX_GEN") \
+        _Pragma("HLS PIPELINE II=1") \
+        _Pragma("HLS DEPENDENCE variable=H_inout inter false") \
+        const data_t t = H_inout[CIDX][j]; \
+        H_inout[(BASE) + 0][j] -= lambda0 * t; \
+        H_inout[(BASE) + 1][j] -= lambda1 * t; \
+        H_inout[(BASE) + 2][j] -= lambda2 * t; \
+        H_inout[(BASE) + 3][j] -= lambda3 * t; \
+    } \
+    for (int i = 0; i < N_STATE; ++i) { \
+        _Pragma("HLS UNROLL") \
+        H_inout[i][m] = 0.0f; \
+    } \
+    p_inout[(BASE) + 0] += lambda0 * r; H_inout[(BASE) + 0][m] = phi_meas * lambda0; \
+    p_inout[(BASE) + 1] += lambda1 * r; H_inout[(BASE) + 1][m] = phi_meas * lambda1; \
+    p_inout[(BASE) + 2] += lambda2 * r; H_inout[(BASE) + 2][m] = phi_meas * lambda2; \
+    p_inout[(BASE) + 3] += lambda3 * r; H_inout[(BASE) + 3][m] = phi_meas * lambda3; \
+    *m_inout = m + 1; \
+}
+#else
+#define DEFINE_MEAS_UPDATE_FUNC(NAME, BASE, CIDX) \
+static inline void NAME( \
+    data_t p_inout[N_STATE], \
+    data_t H_inout[N_STATE][MAX_GEN], \
+    int* m_inout, \
+    data_t y_val, \
+    data_t phi_meas \
+) { \
+    _Pragma("HLS INLINE") \
+    _Pragma("HLS ARRAY_PARTITION variable=p_inout complete dim=1") \
+    _Pragma("HLS ARRAY_PARTITION variable=H_inout complete dim=1") \
+    const int m = *m_inout; \
+    assert(m <= STEP_MEAS_MAX_GEN); \
+    const data_t residual = p_inout[CIDX]; \
+    const data_t r = y_val - residual; \
+    data_t t_sq_acc[4]; \
+    _Pragma("HLS ARRAY_PARTITION variable=t_sq_acc complete dim=1") \
+    for (int l = 0; l < 4; ++l) { \
+        _Pragma("HLS UNROLL") \
+        t_sq_acc[l] = 0.0f; \
+    } \
+    for (int j = 0; j < m; ++j) { \
+        _Pragma("HLS PIPELINE II=1") \
+        _Pragma("HLS LOOP_TRIPCOUNT min=0 max=STEP_MEAS_MAX_GEN") \
+        const int lane = j & 3; \
+        const data_t t = H_inout[CIDX][j]; \
+        t_sq_acc[lane] += t * t; \
+    } \
+    data_t t_sq = 0.0f; \
+    for (int l = 0; l < 4; ++l) { \
+        _Pragma("HLS UNROLL") \
+        t_sq += t_sq_acc[l]; \
+    } \
+    data_t lambda_diag = 0.0f; \
+    if (SELECTED_LAMBDA_METHOD == HLS_LAMBDA_METHOD_FIXED_GAIN) { \
+        lambda_diag = 1.0f; \
+    } else if (SELECTED_LAMBDA_METHOD == HLS_LAMBDA_METHOD_VOLUME) { \
+        const data_t denom = t_sq + phi_meas * phi_meas; \
+        if (denom >= 1e-12f) lambda_diag = t_sq / denom; \
+    } \
+    for (int j = 0; j < m; ++j) { \
+        _Pragma("HLS LOOP_TRIPCOUNT min=0 max=STEP_MEAS_MAX_GEN") \
+        _Pragma("HLS PIPELINE II=1") \
+        _Pragma("HLS DEPENDENCE variable=H_inout inter false") \
+        const data_t t = H_inout[CIDX][j]; \
+        H_inout[CIDX][j] -= lambda_diag * t; \
+    } \
+    for (int i = 0; i < N_STATE; ++i) { \
+        _Pragma("HLS UNROLL") \
+        H_inout[i][m] = 0.0f; \
+    } \
+    p_inout[CIDX] += lambda_diag * r; \
+    H_inout[CIDX][m] = phi_meas * lambda_diag; \
+    *m_inout = m + 1; \
+}
+#endif
+
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b0_s0, 0, 0)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b0_s1, 0, 1)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b4_s4, 4, 4)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b4_s5, 4, 5)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b8_s8, 8, 8)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b8_s9, 8, 9)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b12_s12, 12, 12)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b12_s13, 12, 13)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b16_s16, 16, 16)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b16_s17, 16, 17)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b20_s20, 20, 20)
+DEFINE_MEAS_UPDATE_FUNC(apply_meas_b20_s21, 20, 21)
 
 void predict_kernel(
     const data_t p_x[N_STATE],
@@ -193,6 +349,7 @@ void zonotope_step_kernel(
     const data_t phi[N_MEAS],
     int max_gens
 ) {
+#pragma HLS INLINE
 #pragma HLS ARRAY_PARTITION variable=p_inout complete dim=1
 #pragma HLS ARRAY_PARTITION variable=H_inout cyclic factor=STATE_PAR dim=1
 #pragma HLS ARRAY_PARTITION variable=A       complete dim=2
@@ -200,6 +357,10 @@ void zonotope_step_kernel(
 #pragma HLS ARRAY_PARTITION variable=H_w     cyclic factor=STATE_PAR dim=1
 #pragma HLS ARRAY_PARTITION variable=y       complete dim=1
 #pragma HLS ARRAY_PARTITION variable=phi     complete dim=1
+    static_assert(HLS_LAMBDA_METHOD_ID == HLS_LAMBDA_METHOD_FIXED_GAIN ||
+                  HLS_LAMBDA_METHOD_ID == HLS_LAMBDA_METHOD_SEGMENT ||
+                  HLS_LAMBDA_METHOD_ID == HLS_LAMBDA_METHOD_VOLUME,
+                  "Unsupported compiled HLS lambda method");
 
     int m = *m_inout;
 
@@ -248,7 +409,8 @@ void zonotope_step_kernel(
     data_t col_tmp[N_STATE];
 #pragma HLS ARRAY_PARTITION variable=col_tmp complete dim=1
     for (int k = 0; k < m; ++k) {
-#pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
+#pragma HLS LOOP_TRIPCOUNT min=0 max=REDUCTION_BUDGET
+#pragma HLS DEPENDENCE variable=H_inout inter false
         for (int b = 0; b < OSC_BLOCKS; ++b) {
 #pragma HLS PIPELINE II=1
             const int base = b * OSC_BLOCK_SIZE;
@@ -274,91 +436,46 @@ void zonotope_step_kernel(
                               + A[base + 3][base + 2] * h2
                               + A[base + 3][base + 3] * h3;
         }
-        for (int blk = 0; blk < STATE_BLOCKS; ++blk) {
-#pragma HLS PIPELINE II=1
-            for (int lane = 0; lane < STATE_PAR; ++lane) {
-#pragma HLS UNROLL
-                const int row = blk * STATE_PAR + lane;
-                H_inout[row][k] = col_tmp[row];
-            }
+        for (int i = 0; i < N_STATE; ++i) {
+#pragma HLS UNROLL factor=STATE_PAR
+            H_inout[i][k] = col_tmp[i];
         }
     }
 
     // 1c. Append process-noise generators H_w
     for (int k = 0; k < m_w; ++k) {
-#pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
-        for (int blk = 0; blk < STATE_BLOCKS; ++blk) {
-#pragma HLS PIPELINE II=1
-            for (int lane = 0; lane < STATE_PAR; ++lane) {
-#pragma HLS UNROLL
-                const int row = blk * STATE_PAR + lane;
-                H_inout[row][m + k] = H_w[row][k];
-            }
+#pragma HLS LOOP_TRIPCOUNT min=0 max=N_STATE
+#pragma HLS DEPENDENCE variable=H_inout inter false
+        for (int i = 0; i < N_STATE; ++i) {
+#pragma HLS UNROLL factor=STATE_PAR
+            H_inout[i][m + k] = H_w[i][k];
         }
     }
     m += m_w;
 
     // 2. Early reduce if prediction exceeds budget
     if (m > REDUCTION_BUDGET) {
+        assert(m <= REDUCE_INPUT_MAX_GEN);
         zonotope_reduce(H_inout, &m);
     }
 
-    // 3. Strip updates — fully IN-PLACE on p_inout / H_inout
-    for (int meas = 0; meas < N_MEAS; ++meas) {
-        const int meas_state = meas_state_index(meas);
-        data_t lambda[N_STATE];
-#pragma HLS ARRAY_PARTITION variable=lambda complete dim=1
-        for (int i = 0; i < N_STATE; ++i) {
-#pragma HLS UNROLL
-            lambda[i] = 0.0f;
-        }
-
-        compute_lambda_segment(lambda, H_inout, m, meas_state, phi[meas]);
-
-        // For the current model, each measurement row is a one-hot selector
-        // of the first two states in its 4x4 oscillator block.
-        const data_t residual = p_inout[meas_state];
-        const data_t r = y[meas] - residual;
-
-        // p += lambda * r  (in-place)
-        for (int blk = 0; blk < STATE_BLOCKS; ++blk) {
-#pragma HLS PIPELINE II=1
-            for (int lane = 0; lane < STATE_PAR; ++lane) {
-#pragma HLS UNROLL
-                const int row = blk * STATE_PAR + lane;
-                p_inout[row] += lambda[row] * r;
-            }
-        }
-
-        // Update H a bank-aligned block at a time. This avoids the scheduler
-        // turning the whole 24-row loop into a single fully-unrolled access
-        // burst that exceeds the 8-way cyclic partition on H_inout.
-        for (int j = 0; j < m; ++j) {
-            const data_t t = H_inout[meas_state][j];
-            for (int blk = 0; blk < STATE_BLOCKS; ++blk) {
-#pragma HLS PIPELINE II=1
-#pragma HLS LOOP_TRIPCOUNT min=0 max=MAX_GEN
-                for (int lane = 0; lane < STATE_PAR; ++lane) {
-#pragma HLS UNROLL
-                    const int row = blk * STATE_PAR + lane;
-                    H_inout[row][j] -= lambda[row] * t;
-                }
-            }
-        }
-
-        // Append phi*lambda as new generator
-        for (int blk = 0; blk < STATE_BLOCKS; ++blk) {
-#pragma HLS PIPELINE II=1
-            for (int lane = 0; lane < STATE_PAR; ++lane) {
-#pragma HLS UNROLL
-                const int row = blk * STATE_PAR + lane;
-                H_inout[row][m] = phi[meas] * lambda[row];
-            }
-        }
-        m += 1;
-    }
+    // 3. Strip updates. The measurement pattern is fixed for this model:
+    // two observed states per independent 4-state oscillator block.
+    apply_meas_b0_s0(p_inout, H_inout, &m, y[0], phi[0]);
+    apply_meas_b0_s1(p_inout, H_inout, &m, y[1], phi[1]);
+    apply_meas_b4_s4(p_inout, H_inout, &m, y[2], phi[2]);
+    apply_meas_b4_s5(p_inout, H_inout, &m, y[3], phi[3]);
+    apply_meas_b8_s8(p_inout, H_inout, &m, y[4], phi[4]);
+    apply_meas_b8_s9(p_inout, H_inout, &m, y[5], phi[5]);
+    apply_meas_b12_s12(p_inout, H_inout, &m, y[6], phi[6]);
+    apply_meas_b12_s13(p_inout, H_inout, &m, y[7], phi[7]);
+    apply_meas_b16_s16(p_inout, H_inout, &m, y[8], phi[8]);
+    apply_meas_b16_s17(p_inout, H_inout, &m, y[9], phi[9]);
+    apply_meas_b20_s20(p_inout, H_inout, &m, y[10], phi[10]);
+    apply_meas_b20_s21(p_inout, H_inout, &m, y[11], phi[11]);
 
     // 4. Final reduce
+    assert(m <= STEP_MEAS_MAX_GEN);
     zonotope_reduce(H_inout, &m);
 
     // 5. Write back only m (p_inout and H_inout modified in-place above)
@@ -558,17 +675,20 @@ void zonotope_batch_kernel_axi(
 #pragma HLS ARRAY_PARTITION variable=H_local    cyclic factor=STATE_PAR dim=1
 
     int m_local = *m_inout;
+    assert(m_local >= 0 && m_local <= MAX_GEN);
+    assert(m_w >= 0 && m_w <= MAX_GEN);
     assert(n_steps >= 0 && n_steps <= N_BATCH);
     const int need_reload = reload_params || !params_valid;
 
     // ---- 1. Load current zonotope state ----
     for (int i = 0; i < N_STATE; ++i) {
-#pragma HLS PIPELINE II=1
+#pragma HLS UNROLL
         p_local[i] = p_inout[i];
     }
     for (int r = 0; r < N_STATE; ++r) {
-        for (int c = 0; c < MAX_GEN; ++c) {
+        for (int c = 0; c < m_local; ++c) {
 #pragma HLS PIPELINE II=1
+#pragma HLS LOOP_TRIPCOUNT min=0 max=REDUCTION_BUDGET
             H_local[r][c] = H_inout[r * MAX_GEN + c];
         }
     }
@@ -586,8 +706,9 @@ void zonotope_batch_kernel_axi(
             }
         }
         for (int r = 0; r < N_STATE; ++r) {
-            for (int c = 0; c < MAX_GEN; ++c) {
+            for (int c = 0; c < m_w; ++c) {
 #pragma HLS PIPELINE II=1
+#pragma HLS LOOP_TRIPCOUNT min=0 max=N_STATE
                 H_w_cache[r][c] = H_w[r * MAX_GEN + c];
             }
         }
@@ -626,13 +747,13 @@ void zonotope_batch_kernel_axi(
     // ---- 4. Write back updated zonotope state ----
     *m_inout = m_local;
     for (int i = 0; i < N_STATE; ++i) {
-#pragma HLS PIPELINE II=1
+#pragma HLS UNROLL
         p_inout[i] = p_local[i];
     }
     for (int r = 0; r < N_STATE; ++r) {
-#pragma HLS UNROLL
-        for (int c = 0; c < MAX_GEN; ++c) {
+        for (int c = 0; c < m_local; ++c) {
 #pragma HLS PIPELINE II=1
+#pragma HLS LOOP_TRIPCOUNT min=0 max=REDUCTION_BUDGET
             H_inout[r * MAX_GEN + c] = H_local[r][c];
         }
     }

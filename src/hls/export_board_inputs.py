@@ -13,7 +13,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Export a complete input bundle matching the current HLS batch testbench."
     )
-    parser.add_argument("--out-dir", default="data/output/board_inputs", help="Output directory")
+    parser.add_argument("--out-dir", default="data/input/shared_linear_24d_200", help="Output directory")
     parser.add_argument("--n-state", type=int, default=24, help="State dimension")
     parser.add_argument("--n-meas", type=int, default=12, help="Measurements per step")
     parser.add_argument("--n-steps", type=int, default=200, help="Batch length")
@@ -25,7 +25,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--eps", type=float, default=0.1, help="Cross-coupling strength")
     parser.add_argument("--proc-noise", type=float, default=0.05, help="Process noise radius")
     parser.add_argument("--meas-noise", type=float, default=0.1, help="Measurement noise radius")
-    parser.add_argument("--seed", type=int, default=1, help="LCG seed used by the HLS testbench")
+    parser.add_argument("--seed", type=int, default=42, help="LCG seed used by the HLS/C++ testbenches")
+    parser.add_argument("--benchmark", choices=("oscillator", "dense"), default="oscillator",
+                        help="Linear transition model; dense couples neighbouring oscillator blocks")
+    parser.add_argument("--cross-gain", type=float, default=0.05,
+                        help="Symmetric nearest-neighbour coupling for the dense benchmark")
+    parser.add_argument("--init-radius", type=float, default=0.2, help="Initial state box radius")
     return parser.parse_args()
 
 
@@ -44,7 +49,8 @@ def make_rng(seed: int):
     return uniform_noise
 
 
-def build_a(n_state: int, dt: float, omega: float, zeta: float, eps: float) -> np.ndarray:
+def build_a(n_state: int, dt: float, omega: float, zeta: float, eps: float,
+            benchmark: str = "oscillator", cross_gain: float = 0.05) -> np.ndarray:
     if n_state % 4 != 0:
         raise ValueError(f"n_state must be a multiple of 4, got {n_state}")
     decay = np.exp(-zeta * dt)
@@ -63,6 +69,14 @@ def build_a(n_state: int, dt: float, omega: float, zeta: float, eps: float) -> n
     for b in range(n_state // 4):
         i = 4 * b
         A[i : i + 4, i : i + 4] = block
+    if benchmark == "dense":
+        for b in range(n_state // 4 - 1):
+            left, right = 4 * b, 4 * (b + 1)
+            for offset in (0, 1):
+                A[left + offset, right + offset] += np.float32(cross_gain)
+                A[right + offset, left + offset] += np.float32(cross_gain)
+    elif benchmark != "oscillator":
+        raise ValueError(f"Unknown benchmark: {benchmark}")
     return A
 
 
@@ -83,17 +97,19 @@ def export_inputs(args: argparse.Namespace) -> Path:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    A = build_a(args.n_state, args.dt, args.omega, args.zeta, args.eps)
+    A = build_a(args.n_state, args.dt, args.omega, args.zeta, args.eps,
+                args.benchmark, args.cross_gain)
     C = build_c(args.n_state, args.n_meas)
     uniform_noise = make_rng(args.seed)
 
     p_input = np.zeros(args.n_state, dtype=np.float32)
-    p_input[0] = 1.0
+    for b in range(args.n_state // 4):
+        p_input[4 * b] = 1.0
 
     H_input = np.zeros((args.n_state, args.max_gens), dtype=np.float32)
     h_init_cols = min(args.n_state, args.max_gens)
     for i in range(h_init_cols):
-        H_input[i, i] = np.float32(0.2)
+        H_input[i, i] = np.float32(args.init_radius)
 
     p_w = np.zeros(args.n_state, dtype=np.float32)
     H_w = np.zeros((args.n_state, args.max_gens), dtype=np.float32)
@@ -101,9 +117,9 @@ def export_inputs(args: argparse.Namespace) -> Path:
     for i in range(m_w):
         H_w[i, i] = np.float32(args.proc_noise)
 
-    x_true = np.zeros(args.n_state, dtype=np.float32)
-    for b in range(args.n_state // 4):
-        x_true[4 * b] = 1.0
+    x_true = p_input.copy()
+    x_true_seq = np.zeros((args.n_steps + 1, args.n_state), dtype=np.float32)
+    x_true_seq[0, :] = x_true
 
     phi_vec = np.full(args.n_meas, args.meas_noise, dtype=np.float32)
     y_all = np.zeros((args.n_steps, args.n_meas), dtype=np.float32)
@@ -112,12 +128,15 @@ def export_inputs(args: argparse.Namespace) -> Path:
     for k in range(args.n_steps):
         w_k = np.array([uniform_noise(args.proc_noise) for _ in range(args.n_state)], dtype=np.float32)
         x_true = (A @ x_true + w_k).astype(np.float32)
+        x_true_seq[k + 1, :] = x_true
         for j in range(args.n_meas):
             v = uniform_noise(args.meas_noise)
             y_all[k, j] = np.float32(C[j] @ x_true + v)
             phi_all[k, j] = phi_vec[j]
 
     np.save(out_dir / "A.npy", A)
+    np.save(out_dir / "C.npy", C)
+    np.save(out_dir / "x_true.npy", x_true_seq)
     np.save(out_dir / "y_all.npy", y_all)
     np.save(out_dir / "phi_all.npy", phi_all)
     np.save(out_dir / "p_input.npy", p_input)
@@ -125,6 +144,8 @@ def export_inputs(args: argparse.Namespace) -> Path:
     np.save(out_dir / "p_w.npy", p_w)
     np.save(out_dir / "H_w.npy", H_w)
     np.savetxt(out_dir / "A.csv", A, delimiter=",", fmt="%.9g")
+    np.savetxt(out_dir / "C.csv", C, delimiter=",", fmt="%.9g")
+    np.savetxt(out_dir / "x_true.csv", x_true_seq, delimiter=",", fmt="%.9g")
     np.savetxt(out_dir / "y_all.csv", y_all, delimiter=",", fmt="%.9g")
     np.savetxt(out_dir / "phi_all.csv", phi_all, delimiter=",", fmt="%.9g")
     np.savetxt(out_dir / "p_input.csv", p_input.reshape(1, -1), delimiter=",", fmt="%.9g")
@@ -134,6 +155,13 @@ def export_inputs(args: argparse.Namespace) -> Path:
 
     meta = {
         "seed": args.seed,
+        "benchmark": args.benchmark,
+        "cross_gain": args.cross_gain if args.benchmark == "dense" else 0.0,
+        "dt": args.dt,
+        "omega": args.omega,
+        "zeta": args.zeta,
+        "eps": args.eps,
+        "noise_generator": "LCG 1664525*x + 1013904223 (uint32)",
         "n_state": args.n_state,
         "n_meas": args.n_meas,
         "n_steps": args.n_steps,
@@ -141,9 +169,11 @@ def export_inputs(args: argparse.Namespace) -> Path:
         "reduction_budget": args.reduction_budget,
         "h_init_cols": int(h_init_cols),
         "m_w": int(m_w),
-        "init_radius": 0.2,
+        "init_radius": args.init_radius,
         "proc_noise_radius": args.proc_noise,
         "meas_noise_radius": args.meas_noise,
+        "x_true_includes_step0": True,
+        "measurement_row_k_uses_x_true_row": "k+1",
     }
     (out_dir / "meta.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="ascii")
 
@@ -157,6 +187,8 @@ def export_inputs(args: argparse.Namespace) -> Path:
         f"h_init_cols={h_init_cols}",
         f"m_w={m_w}",
         f"A_shape={A.shape}",
+        f"C_shape={C.shape}",
+        f"x_true_shape={x_true_seq.shape}",
         f"y_all_shape={y_all.shape}",
         f"phi_all_shape={phi_all.shape}",
         f"p_input_shape={p_input.shape}",
@@ -173,6 +205,7 @@ def main() -> None:
     out_dir = export_inputs(args)
     print(f"Saved inputs under: {out_dir}")
     print(f"A:      {out_dir / 'A.npy'}")
+    print(f"x_true: {out_dir / 'x_true.npy'}")
     print(f"y_all:  {out_dir / 'y_all.npy'}")
     print(f"phi_all:{out_dir / 'phi_all.npy'}")
     print(f"p_input:{out_dir / 'p_input.npy'}")

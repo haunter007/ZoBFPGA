@@ -12,6 +12,7 @@ Requires:
     matplotlib
 """
 
+import json
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,44 +22,74 @@ import time
 
 
 # =============================================================================
-# CONFIGURATION (EDIT HERE)
+# CONFIGURATION
+#
+# N_STATE/N_INPUT/N_MEAS/REDUCTION_BUDGET/RANDOM_SEED/DT/noise radii are read
+# from the single-source config config/zonotope_params.json -- the SAME file
+# that generates include/zonotope_params.hpp for the C++/HLS side (see
+# tools/gen_zonotope_params.py). Edit the JSON, not this file, to change
+# dimensions/budgets so all three platforms stay in sync.
+#
+# Each value can still be overridden per-run via an env var (handy for ad-hoc
+# sweeps without touching the JSON), but the JSON is the default/source of
+# truth.
 # =============================================================================
 
+_REPO_ROOT_FOR_CFG = Path(__file__).resolve().parents[2]
+with (_REPO_ROOT_FOR_CFG / "config" / "zonotope_params.json").open() as _cfg_f:
+    _CFG = json.load(_cfg_f)
+
+
+def _cfg_int(key: str, env_name: str) -> int:
+    return int(os.getenv(env_name, str(_CFG[key])))
+
+
+def _cfg_float(key: str, env_name: str) -> float:
+    return float(os.getenv(env_name, str(_CFG[key])))
+
+
 # State dimension 状态维度
-N_STATE = 24          # n  (6 coupled oscillator blocks × 4)
+N_STATE = _cfg_int("n_state", "ZONO_N_STATE")          # n  (6 coupled oscillator blocks × 4)
 
 # Input dimension 输入维度
-N_INPUT = 1          # n_u 
+N_INPUT = _cfg_int("n_input", "ZONO_N_INPUT")          # n_u
 
 # Number of scalar measurements 测量维度
-N_MEAS = 12    # n_y (2 measurements per 4x4 oscillator block)
+N_MEAS = _cfg_int("n_meas", "ZONO_N_MEAS")    # n_y (2 measurements per 4x4 oscillator block)
 
-# Number of simulation steps 仿真步数
+# Number of simulation steps 仿真步数 (not part of the shared struct sizing,
+# so it is NOT in zonotope_params.json -- only the env var controls it here).
 NUM_STEPS = int(os.getenv("ZONO_NUM_STEPS", "100"))
 
 # Sampling time 采样时间
-DT = 0.1            
+DT = _cfg_float("dt", "ZONO_DT")
 
 # Process noise radius (per state coordinate, box-shaped zonotope) 过程噪声半径
-PROC_NOISE_RADIUS = 0.05  # 0.05
+PROC_NOISE_RADIUS = _cfg_float("proc_noise_radius", "ZONO_PROC_NOISE_RADIUS")
 
 # Measurement noise radius (per measurement, box-shaped zonotope) 测量噪声半径
-MEAS_NOISE_RADIUS = 0.1  # 0.1
+MEAS_NOISE_RADIUS = _cfg_float("meas_noise_radius", "ZONO_MEAS_NOISE_RADIUS")
 
 # Initial state box radius (per coordinate)
-INIT_RADIUS = 0.2  # 0.2
+INIT_RADIUS = _cfg_float("init_radius", "ZONO_INIT_RADIUS")
 
-# Zonotope reduction budget (max # of generators kept before row-sum aggregation) 
-REDUCTION_BUDGET = 32
+# Zonotope reduction budget (max # of generators kept before row-sum aggregation)
+REDUCTION_BUDGET = _cfg_int("reduction_budget", "ZONO_REDUCTION_BUDGET")
 
 # Random seed for reproducibility 随机种子用于可重复性？
-RANDOM_SEED = 42
+RANDOM_SEED = _cfg_int("random_seed", "ZONO_RANDOM_SEED")
+
+if REDUCTION_BUDGET <= N_STATE:
+    raise ValueError(
+        f"REDUCTION_BUDGET ({REDUCTION_BUDGET}) must be > N_STATE ({N_STATE}); "
+        "mirrors the TOPK-positivity guard in include/zonotope_params.hpp."
+    )
 
 # Output partition for Python-vs-HLS comparison results
-OUTPUT_PARTITION = "python_hls_compare"
+OUTPUT_PARTITION = "comparison/python_hls"
 HLS_REF_MODE = "csim"              # csim/cosim/ (prefer current step_axi csim)
-HLS_REF_METHOD = "LAMBDA_SEGMENT"  # LAMBDA_P_RADIUS/LAMBDA_SEGMENT/LAMBDA_VOLUME/NONE
-ESTIMATION_METHOD = "segment"      # 'None', 'segment', 'p_radius', 'volume'
+HLS_REF_METHOD = "LAMBDA_SEGMENT"  # LAMBDA_P_RADIUS/LAMBDA_SEGMENT/LAMBDA_VOLUME/Fixed-gain
+ESTIMATION_METHOD = "segment"      # 'Fixed-gain', 'segment', 'p_radius', 'volume'
 
 
 # =============================================================================
@@ -272,10 +303,10 @@ class Zonotope:
         Wrapper around fpga_strip_update_kernel.
 
         If lam is None, we choose lam = c (simple and effective in practice).
-        method: 'None','segment', 'p_radius', 'volume'
+        method: 'Fixed-gain','segment', 'p_radius', 'volume'
         """
         c = np.asarray(c, dtype=float).reshape(-1)
-        if method =='None':
+        if method == 'Fixed-gain':
             lam = c.copy()
 
         elif method == 'segment':
@@ -289,7 +320,7 @@ class Zonotope:
             lam = self._optimal_lambda_volume(c, phi)
             
         else:
-            raise ValueError(f"unknown method: {method}. Can choose: 'None', 'segment', 'p_radius', 'volume'")
+            raise ValueError(f"unknown method: {method}. Can choose: 'Fixed-gain', 'segment', 'p_radius', 'volume'")
         
         p_hat, H_hat = fpga_strip_update_kernel(
             p=self.p,
@@ -412,8 +443,8 @@ class Zonotope:
         # keep_count: slots for "real" generators; n slots reserved for diag box
         keep_count = max(0, max_gens - n)
 
-        col_norms = np.linalg.norm(self.H, axis=0)
-        idx_sorted = np.argsort(-col_norms)  # descending
+        col_scores = np.sum(self.H * self.H, axis=0)
+        idx_sorted = np.lexsort((np.arange(m), -col_scores))
 
         keep_idx = idx_sorted[:keep_count]
         drop_idx = idx_sorted[keep_count:]
@@ -509,7 +540,7 @@ class Zonotope:
 # SYSTEM MATRICES (TIME-VARYING, PARAMETRIC)
 # =============================================================================
 
-def system_matrices(k, dt=DT):        # DT=0.1-Sampling time 采样时间
+def system_matrices(k, dt=DT, dense=False):        # DT=0.1-Sampling time 采样时间
     """
     Defines time-varying (A_k, B_k, C_k) for an n-dimensional system.
 
@@ -519,6 +550,15 @@ def system_matrices(k, dt=DT):        # DT=0.1-Sampling time 采样时间
     - C_k: select the first N_MEAS state components.
 
     This keeps everything nicely structured and works for any N_STATE >= 2.
+
+    dense=True selects the second ("dense") benchmark: nearest-neighbour
+    cross-block coupling is added between adjacent 4-state oscillator
+    blocks, so A_k is block-*tridiagonal* rather than block-*diagonal*.
+    This exercises any code path that assumes per-block locality (the
+    default benchmark's A is strictly block-diagonal, so a column of H
+    that starts confined to one block stays confined to that block
+    through predict/strip-update/reduce -- the dense variant breaks that
+    invariant on purpose).
     """
     theta = 0.05 * k * dt  # small angle
 
@@ -559,6 +599,21 @@ def system_matrices(k, dt=DT):        # DT=0.1-Sampling time 采样时间
     for i in range(N_STATE // 4):
         start = i * 4
         A_k[start:start+4, start:start+4] = A_block
+
+    if dense:
+        # Second benchmark: couple each block's first two states (q, v) to
+        # the same states of its immediate neighbour block(s), symmetric,
+        # This is a finite-horizon stress benchmark. The original 4x4 block
+        # already has spectral radius slightly above one, so neither model
+        # should be described as asymptotically stable.
+        cross_gain = 0.05
+        n_blocks = N_STATE // 4
+        for i in range(n_blocks - 1):
+            a, b = i * 4, (i + 1) * 4
+            A_k[a, b]     += cross_gain   # block i's q  <- block i+1's q
+            A_k[a + 1, b + 1] += cross_gain   # block i's v  <- block i+1's v
+            A_k[b, a]     += cross_gain   # block i+1's q <- block i's q
+            A_k[b + 1, a + 1] += cross_gain   # block i+1's v <- block i's v
 
     # No actual control input, but keep the dimension
     B_k = np.zeros((N_STATE, N_INPUT))
@@ -702,6 +757,101 @@ def _max_error_from_zonotopes(zonotopes, true_arr):
         far_points[k, :n] = x_far[:n]
 
     return max_err, far_points
+
+
+# ── strict containment (exact zonotope membership, not the interval-hull
+#    necessary condition) ────────────────────────────────────────────────
+def is_contained_strict(p, H, x, tol=1e-9):
+    """
+    Exact test for x in Z = {p + H*xi : ||xi||_inf <= 1}.
+
+    Solves the LP
+        minimize t
+        s.t.  H*xi = x - p
+              -t <= xi_i <= t   for all i
+              t >= 0
+    x is contained in Z iff the optimal t* <= 1 (+tol). This is the actual
+    zonotope-membership test; the cheaper `|x-p| <= sum(|H|, axis=1)`
+    interval-hull check used elsewhere in this codebase is only a
+    NECESSARY condition (it can pass even when x is not actually inside
+    the zonotope), so it over-counts containment. Use this one for
+    reported containment-rate metrics.
+    """
+    from scipy.optimize import linprog
+
+    p = np.asarray(p, dtype=float).reshape(-1)
+    x = np.asarray(x, dtype=float).reshape(-1)
+    H = np.asarray(H, dtype=float)
+    if H.ndim == 1:
+        H = H.reshape(p.size, 1)
+    m = H.shape[1]
+    b = x - p
+
+    if m == 0:
+        return bool(np.max(np.abs(b)) <= tol)
+
+    # Variables: [xi_1..xi_m, t]. Objective: minimize t.
+    c_obj = np.zeros(m + 1)
+    c_obj[-1] = 1.0
+
+    # -t <= xi_i <= t  <=>  xi_i - t <= 0  and  -xi_i - t <= 0
+    A_ub = np.zeros((2 * m, m + 1))
+    for i in range(m):
+        A_ub[2 * i, i] = 1.0
+        A_ub[2 * i, -1] = -1.0
+        A_ub[2 * i + 1, i] = -1.0
+        A_ub[2 * i + 1, -1] = -1.0
+    b_ub = np.zeros(2 * m)
+
+    A_eq = np.hstack([H, np.zeros((H.shape[0], 1))])
+    b_eq = b
+
+    bounds = [(None, None)] * m + [(0.0, None)]
+
+    res = linprog(c_obj, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
+                   bounds=bounds, method="highs")
+    if not res.success:
+        return False
+    return bool(res.x[-1] <= 1.0 + tol)
+
+
+def containment_flags_strict(zonotopes, true_arr):
+    n_steps = min(len(zonotopes), true_arr.shape[0])
+    flags = np.zeros((n_steps,), dtype=bool)
+    for k in range(n_steps):
+        flags[k] = is_contained_strict(zonotopes[k].p, zonotopes[k].H, true_arr[k])
+    return flags
+
+
+def compute_quality_metrics(x_true_arr, center_est_arr, zonotopes, step_time_us):
+    """
+    Aggregate quality/performance metrics for one (method, seed) run.
+    Returns a plain dict so it serializes to a CSV row directly.
+    """
+    used = min(len(zonotopes), x_true_arr.shape[0], center_est_arr.shape[0])
+    err = center_est_arr[:used] - x_true_arr[:used]
+    per_step_l2 = np.linalg.norm(err, axis=1)
+
+    widths = np.array([2.0 * np.sum(np.abs(z.H), axis=1) for z in zonotopes[:used]])
+    mean_width = float(np.mean(widths)) if widths.size else float("nan")
+    max_width = float(np.max(widths)) if widths.size else float("nan")
+
+    contained = containment_flags_strict(zonotopes[:used], x_true_arr[:used])
+    gens = np.array([z.m for z in zonotopes[:used]], dtype=float)
+    step_us = np.asarray(step_time_us, dtype=float)
+
+    return {
+        "rmse": float(np.sqrt(np.mean(err ** 2))),
+        "max_center_error": float(np.max(per_step_l2)) if per_step_l2.size else float("nan"),
+        "containment_rate": float(np.mean(contained)) if contained.size else float("nan"),
+        "mean_interval_width": mean_width,
+        "max_interval_width": max_width,
+        "mean_generators": float(np.mean(gens)) if gens.size else float("nan"),
+        "max_generators": float(np.max(gens)) if gens.size else float("nan"),
+        "mean_step_time_us": float(np.mean(step_us)) if step_us.size else float("nan"),
+        "n_steps": int(used),
+    }
+
 
 # 导出 Python 结果以供 HLS 比较和分析。
 def _export_python_outputs(python_dir, x_true_arr, center_est_arr, y_arr, zonotopes, step_time_us):
@@ -924,23 +1074,28 @@ def _plot_hls_vs_python(compare_dir, x_true_arr, center_est_arr, zonotopes, step
 # MAIN SIMULATION + ESTIMATION
 # =============================================================================
 
-def run_example(method=None, method_label=None):
+def simulate_estimator(method, seed=None, dense=False, verbose=True):
     """
-    method: 传入方法字符串，如 'None','segment','p_radius','volume'
-            传 None 时使用全局 ESTIMATION_METHOD
-            method string, e.g. 'None','segment','p_radius','volume'.
-            If None, uses global ESTIMATION_METHOD.
-    method_label: 输出目录名，如 'LAMBDA_NONE'
-                  output directory name, e.g. 'LAMBDA_NONE'
-    """
-    if method is None:
-        method = ESTIMATION_METHOD
-    if method_label is None:
-        method_label = "LAMBDA_" + method.upper()
+    Core prediction/correction/reduction loop, decoupled from CSV export and
+    plotting so it can be reused both by run_example() (single run, full
+    export -- unchanged behavior) and by a multi-seed/multi-benchmark sweep
+    (many runs, no per-step file I/O).
 
+    method: 'Fixed-gain','segment','p_radius','volume'
+    seed: RNG seed for this run; defaults to the global RANDOM_SEED (same
+          behavior as before this function existed).
+    dense: selects the second ("dense") benchmark's A_k (see
+           system_matrices(dense=...)).
+    verbose: print per-step diagnostics (matches the old run_example output
+             when True; sweeps pass False to stay fast/quiet).
+
+    Returns (x_true_arr, center_est_arr, y_arr, zonotopes, step_time_us).
+    """
+    if seed is None:
+        seed = RANDOM_SEED
     # NumPy的伪随机数生成器，相同的初始种子（第一个），会生成相同的随机序列
-    # Reset seed per method for fair comparison (same noise sequence)
-    np.random.seed(RANDOM_SEED)
+    # Reset seed per run for fair comparison (same noise sequence across methods)
+    np.random.seed(seed)
 
     # -----------------------------
     # Process noise zonotope W
@@ -988,7 +1143,7 @@ def run_example(method=None, method_label=None):
     size_history = []
 
     for k in range(NUM_STEPS):
-        A_k, B_k, C_k = system_matrices(k, dt=DT)
+        A_k, B_k, C_k = system_matrices(k, dt=DT, dense=dense)
 
         # === TRUE SYSTEM === 真实系统仿真（计时外，与 FPGA board 基准对齐）
         # True system update: outside timing window, aligned with board standard
@@ -1007,7 +1162,7 @@ def run_example(method=None, method_label=None):
         step_start = time.perf_counter()
 
         # === ESTIMATOR: Prediction ===
-        X_pred = X.predict(A_k, B_k, u_k, W)
+        X_pred = X.predict(A_k, B_k, u_k, W).reduce(max_gens=REDUCTION_BUDGET)
 
         # === ESTIMATOR: Correction with N_MEAS strips ===
         X_upd = X_pred
@@ -1016,7 +1171,7 @@ def run_example(method=None, method_label=None):
             y_tilde_i = y_k[i] - p_v[i]      # shift by center of meas noise
             phi_i = phi_vec[i]
             X_upd = X_upd.intersect_with_strip(c=c_i, y=y_tilde_i, phi=phi_i, method=method)
-        ''' method: 'None','segment', 'p_radius', 'volume'''
+        ''' method: 'Fixed-gain','segment', 'p_radius', 'volume'''
 
         # === Reduction ===
         X = X_upd.reduce(max_gens=REDUCTION_BUDGET)
@@ -1030,21 +1185,46 @@ def run_example(method=None, method_label=None):
         # 记录Zonotope大小
         zonotope_size = np.sum(np.linalg.norm(X.H, axis=0))
         size_history.append(zonotope_size)
-        print(f"Steps {k}: Zonotope size = {zonotope_size:.4f}")
 
-        print(f"\n--- Time step k = {k+1} ---")
-        print(f"True state       x_true = {x_true}")
-        print(f"Measurement        y_k  = {y_k}")
-        print(f"Estimator center  p^x_k = {X.p}")
-        print(f"# generators m_k          = {X.m}")
+        if verbose:
+            print(f"Steps {k}: Zonotope size = {zonotope_size:.4f}")
+            print(f"\n--- Time step k = {k+1} ---")
+            print(f"True state       x_true = {x_true}")
+            print(f"Measurement        y_k  = {y_k}")
+            print(f"Estimator center  p^x_k = {X.p}")
+            print(f"# generators m_k          = {X.m}")
 
     x_true_arr = np.vstack(x_true_list)         # (NUM_STEPS+1, N_STATE)
     center_est_arr = np.vstack(center_est_list) # (NUM_STEPS+1, N_STATE)
     y_arr = np.vstack(y_list)                   # (NUM_STEPS, N_MEAS)
 
-    print("\nSimulation completed.")
-    print("Final true state      :", x_true_arr[-1])
-    print("Final estimate center :", center_est_arr[-1])
+    if verbose:
+        print("\nSimulation completed.")
+        print("Final true state      :", x_true_arr[-1])
+        print("Final estimate center :", center_est_arr[-1])
+
+    return x_true_arr, center_est_arr, y_arr, zonotopes, step_time_us
+
+
+def run_example(method=None, method_label=None):
+    """
+    method: 传入方法字符串，如 'Fixed-gain','segment','p_radius','volume'
+            传 None 时使用全局 ESTIMATION_METHOD
+            method string, e.g. 'Fixed-gain','segment','p_radius','volume'.
+            If None, uses global ESTIMATION_METHOD.
+    method_label: 输出目录名，如 'Fixed-gain'
+                  output directory name, e.g. 'Fixed-gain'
+    """
+    if method is None:
+        method = ESTIMATION_METHOD
+    if method_label is None and method == "Fixed-gain":
+        method_label = "Fixed-gain"
+    if method_label is None:
+        method_label = "LAMBDA_" + method.upper()
+
+    x_true_arr, center_est_arr, y_arr, zonotopes, step_time_us = simulate_estimator(
+        method, seed=RANDOM_SEED, dense=False, verbose=True
+    )
 
     base_dir, python_dir, compare_dir = _prepare_output_dirs(method_label)
     _export_python_outputs(

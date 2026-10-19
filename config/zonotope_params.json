@@ -1,0 +1,15 @@
+{
+  "_comment": "Single source of truth for zonotope estimator structural dimensions. Edit values here, then run `python3 scripts/gen_zonotope_params.py` (or just `make`, which regenerates include/zonotope_params.hpp automatically) to propagate to C++/HLS. Python reads this file directly at import time. Do NOT hand-edit include/zonotope_params.hpp; it is generated.",
+
+  "n_state": 24,
+  "n_input": 1,
+  "n_meas": 12,
+  "max_gen": 64,
+  "reduction_budget": 32,
+  "random_seed": 42,
+
+  "dt": 0.1,
+  "proc_noise_radius": 0.05,
+  "meas_noise_radius": 0.1,
+  "init_radius": 0.2
+}
